@@ -1,0 +1,85 @@
+from cmu_112_graphics import *
+
+from CameraDetector import *
+
+
+def appStarted(app):
+    #app.cameraOpen = True
+    #app.cam1 = CameraDetector()
+    #app.cam1.cameraOpen = True
+
+    
+
+    #app.thread1 = camThread(app)
+    #app.thread1.start()
+    pass
+
+
+def timerFired(app):
+
+    pass
+
+def keyPressed(app, event):
+
+    """if event.key == 'Up':
+        app.cam1.changeSens(5)
+        print(app.cam1.sens)
+
+    if event.key == 'Down':
+        app.cam1.changeSens(-5)
+        print(app.cam1.sens)
+
+    if event.key == 'Left':
+        app.cam1.changeThresh(-5)
+        print(app.cam1.thresh, 'thresh')
+
+    if event.key == 'Right':
+        app.cam1.changeThresh(5)
+        print(app.cam1.thresh, 'thresh')"""
+
+    
+
+def redrawAll(app, canvas):
+
+    pass
+
+#from https://www.tutorialspoint.com/python/python_multithreading.htm#:~:text=Python%20-%20Multithreaded%20Programming%201%20Starting%20a%20New,Synchronizing%20Threads.%20...%205%20Multithreaded%20Priority%20Queue.%20
+
+class camThread(threading.Thread):
+    
+    def __init__(self, app):
+      threading.Thread.__init__(self)
+      self.running = True
+      self.app = app
+
+    def run(self):
+        #print ("Starting " + self.name)
+        print('running')
+        time.sleep(1)
+
+        while self.app.cam1.cameraOpen:
+            self.app.cam1.runFeed()
+
+            # Get lock to synchronize threads
+            #threadLock.acquire()
+            # Free lock to release next thread
+            #threadLock.release()
+          
+
+    def stop(self):
+        self.running = False
+
+
+      # Get lock to synchronize threads
+      #threadLock.acquire()
+      # Free lock to release next thread
+      #threadLock.release()
+
+
+
+def main():
+    runApp(width = 400, height = 400)
+
+if __name__ == "__main__":
+    main()
+
