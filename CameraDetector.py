@@ -3,7 +3,7 @@ import cv2, threading, time, copy
 import numpy as np
 #from cmu_112_graphics import *
 
-
+#====================== REDUNDANT FILE AND CLASS DELETE LATER ======================
 #TODO: FIX CAMERA CRASHING GAME ON EXIT
 class CameraDetector(object):
 

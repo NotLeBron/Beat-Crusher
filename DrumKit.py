@@ -1,19 +1,105 @@
 from cmu_112_graphics import *
 
+import pygame
+
 class DrumPiece(object):
 
-    def __init__(self, timeStamp, scale):
-
+    def __init__(self, timeStamp, ticksPerSec, types, timeCreated, fps, scale=.01):
+        #print(currTime)
+        #self.timeOnCreation = currTime
+        self.types = types
+        self.offset = 2 
         self.timeStamp = timeStamp
-
+        self.timeStampSeconds = (self.timeStamp * ticksPerSec)/1000 + self.offset
+        self.havePlayed  = False
+        
+        self.timeCreated = timeCreated
         self.scale = scale
+        if fps > 5:
+            self.growthRate = self.calcGrowthRate() /(15 - 15/fps)
+
+        else:
+            self.growthRate = self.calcGrowthRate() /(15)
+
+        self.canHit = False
+
+        
+        
+        
+
+        if types == 'hihat':
+            self.sound = pygame.mixer.Sound("Resources/Audio files/hihat.mp3")
+
+        elif types == 'snare':
+            self.sound = pygame.mixer.Sound("Resources/Audio files/snare.mp3")
+
+        elif types == 'high':
+            self.sound = pygame.mixer.Sound("Resources/Audio files/highTom.mp3")
+
+        elif types == 'mid':
+            self.sound = pygame.mixer.Sound("Resources/Audio files/midTom.mp3")
+
+        elif types == 'floor':
+            self.sound = pygame.mixer.Sound("Resources/Audio files/floorTom.mp3")
+
+        elif types == 'cymb':
+            self.sound = pygame.mixer.Sound("Resources/Audio files/cymb.mp3")
 
 
-        self.isActive
+        self.bassDrum = pygame.mixer.Sound("Resources/Audio files/bassDrum.mp3")
+        self.cymb = pygame.mixer.Sound("Resources/Audio files/cymb.mp3")
 
-    def isActive(self):
-        return self.isActive
 
+        self.isActive = True
+
+    def calcGrowthRate(self):
+
+
+        self.lifespan = (self.timeStampSeconds-self.timeCreated)
+        maxScale = 1.19
+        
+        return (maxScale-self.scale)/self.lifespan
+
+
+    def grow(self):
+        self.scale += self.growthRate
+
+    def playSound(self):
+
+        if self.havePlayed == False:
+            if self.types == 'snare':
+                pygame.mixer.Channel(0).play(self.sound, maxtime=500)
+                return 'played'
+
+            elif self.types == 'hihat':
+                pygame.mixer.Channel(1).play(self.sound, maxtime=500)
+                return 'played'
+
+            elif self.types == 'cymb':
+                pygame.mixer.Channel(2).play(self.sound)
+                return 'played'
+
+            elif self.types == 'floor':
+                pygame.mixer.Channel(3).play(self.sound)
+                return 'played'
+            
+            elif self.types == 'high':
+                pygame.mixer.Channel(4).play(self.sound)
+                return 'played'
+
+            elif self.types == 'mid':
+                pygame.mixer.Channel(5).play(self.sound)
+                return 'played'
+
+        return 'not played'
+
+    def changeStatus(self):
+        self.havePlayed =True
+
+    def checkHit(self, redx, redy, bluex, bluey):
+        
+        return False
+        
 
     def getTimeStamp(self):
         return self.timeStamp
@@ -22,22 +108,38 @@ class DrumPiece(object):
     def scaleObject(self, scale):
         self.scale = scale
 
-    def drawObject(self, canvas):
+
+
+    def drawObject(self, app, canvas):
 
         pass
 
-
 class Snare(DrumPiece):
 
-    def __init__(self, timeStamp, scale):
-        super().__init__(timeStamp, scale)
+    def __init__(self, timeStamp, ticksPerSec, types, timeCreated, fps):
+        super().__init__(timeStamp, ticksPerSec, types, timeCreated, fps)
 
     
-    def drawObject(self, canvas):
+    def checkHit(self, redx, redy, bluex, bluey):
+        
+        #369.1, 785.41, 630.9, 880.59
+        if ((redx <= 630.9 and redx >= 369.1 and
+            redy <= 880.59 and redy >= 785.41) or 
+            (bluex <= 630.9 and bluex >= 369.1 and
+            bluey <= 880.59 and bluey >= 785.41)):
+
+            return True
+
+
+        return False
+
+
+    
+    def drawObject(self, app, canvas):
         if self.scale > 1.19:
             self.scale = 1.19
 
-        x = 500
+        x = 500 
         y = 700 *self.scale
 
         yRad = 40 *self.scale
@@ -69,15 +171,45 @@ class Snare(DrumPiece):
         canvas.create_oval(x+xRad, y+yRad, x-xRad, y-yRad, fill=topColor)
         pass
 
-
 class Tom(DrumPiece):
 
-    def __init__(self, timeStamp, scale, type):
-        super().__init__(timeStamp, scale)
+    def __init__(self, timeStamp, ticksPerSec,  types, timeCreated, fps):
+        super().__init__(timeStamp, ticksPerSec, types, timeCreated, fps)
 
-        self.type = type
+        self.type = types
 
-    def drawObject(self, canvas):
+    def checkHit(self, redx, redy, bluex, bluey):
+        if self.types == 'mid':
+            #569.1, 499.81, 830.9, 690.19
+            if ((redx <= 830.9 and redx >= 569.1 and
+                redy <= 690.19 and redy >= 499.81) or 
+                (bluex <= 830.9 and bluex >= 569.1 and
+                bluey <= 690.19 and bluey >= 499.81)):
+
+                return True
+
+        elif self.types == 'high':
+            #869.1, 595-95.19, 1130.9, 690.19
+            if ((redx <= 1580.9 and redx >= 869.1 and
+                redy <= 1130.9 and redy >= 499.81) or 
+                (bluex <= 1580.9 and bluex >= 869.1 and
+                bluey <= 1130.9 and bluey >= 499.81)):
+
+                return True
+
+        elif self.types == 'floor':
+            #1041.5, 702.11, 1398.5, 892.49
+            if ((redx <= 1398.5 and redx >= 1041.5 and
+                redy <= 892.49 and redy >= 702.11) or 
+                (bluex <= 1398.5 and bluex >= 1041.5 and
+                bluey <= 892.49 and bluey >= 702.11)):
+
+                return True
+
+        return False
+
+
+    def drawObject(self, app, canvas):
         if self.scale > 1.19:
             self.scale = 1.19
 
@@ -126,10 +258,23 @@ class Tom(DrumPiece):
 
 class CrashCymbol(DrumPiece):
 
-    def __init__(self, timeStamp, scale):
-        super().__init__(timeStamp, scale)
+    def __init__(self, timeStamp, ticksPerSec,  types, timeCreated, fps):
+        super().__init__(timeStamp, ticksPerSec, types, timeCreated, fps)
 
-    def drawObject(self, canvas):
+    def checkHit(self, redx, redy, bluex, bluey):
+
+        #1450-130.9, 333.2-47.59, 1450+130.9, 333.2+47.59
+        if ((redx <= 1580.9 and redx >= 1319.1 and
+            redy <= 380.67 and redy >= 285.73) or 
+            (bluex <= 1580.9 and bluex >= 1319.1 and
+            bluey <= 380.67 and bluey >= 285.73)):
+
+            return True
+
+        return False
+
+
+    def drawObject(self, app, canvas):
         if self.scale > 1.19:
             self.scale = 1.19
         x = 1450
@@ -154,10 +299,22 @@ class CrashCymbol(DrumPiece):
 
 class HiHat(DrumPiece):
 
-    def __init__(self, timeStamp, scale):
-        super().__init__(timeStamp, scale)
+    def __init__(self, timeStamp, ticksPerSec, types, timeCreated, fps):
+        super().__init__(timeStamp, ticksPerSec, types, timeCreated, fps)
 
-    def drawObject(self, canvas):
+    def checkHit(self, redx, redy, bluex, bluey):
+
+        #390.9, 499.79, 129.1, 404.61
+        if ((redx <= 390.9 and redx >= 129.1 and
+            redy <= 499.79 and redy >= 404.61) or 
+            (bluex <= 390.9 and bluex >= 129.1 and
+            bluey <= 499.79 and bluey >= 404.61)):
+
+            return True
+
+        return False
+
+    def drawObject(self, app, canvas):
 
         #dont get bigger than this
         if self.scale > 1.19:
@@ -182,96 +339,142 @@ class HiHat(DrumPiece):
             canvas.create_oval(x+xRad, y+yRad, x-xRad, y-yRad)
 
 
+
+def createObject(timeStamp, kind, timeCreated, song, fps, ticksPerSec = 60000/(116*384)):
+
+    if song == 'Smells Like Teen Spirit':
+        ticksPerSec = 60000/(116*384)
+
+    if song == 'Boulevard of Broken Dreams':
+        ticksPerSec = 60000/(83*480)
+
+    if kind == 'snare':
+        return Snare(timeStamp, ticksPerSec, 'snare', timeCreated, fps)
+
+    elif kind == 'hihat':
+        return HiHat(timeStamp, ticksPerSec, 'hihat', timeCreated, fps)
+
+    elif kind == 'mid':
+        return Tom(timeStamp, ticksPerSec,'mid', timeCreated, fps)
+
+    elif kind == 'high':
+        return Tom(timeStamp, ticksPerSec,'high', timeCreated,fps)
+
+    elif kind == 'cymb':
+        return CrashCymbol(timeStamp, ticksPerSec, 'cymb', timeCreated, fps)
+
+    elif kind == 'floor':
+        return Tom(timeStamp, ticksPerSec, 'floor', timeCreated, fps)
+
     
 
-
-    
-    
-    
-
-
-
-
-
-
-
-def appStarted(app):
-    app.scale  = .01
-    #.img = Image.open('background.png')
-
-    app.snare = Snare(1, app.scale)
-    app.hihat = HiHat(1, app.scale)
-    app.midTom = Tom(1, app.scale, 'mid')
-    app.highTom = Tom(1, app.scale, 'high')
-    app.floorTom = Tom(1, app.scale, 'floor')
-    app.crashCymbol = CrashCymbol(1, app.scale)
-
-    app.drumKit = set()
-    app.drumKit.add(app.snare)
-    app.drumKit.add(app.hihat)
-    app.drumKit.add(app.midTom)
-    app.drumKit.add(app.highTom)
-    app.drumKit.add(app.floorTom)
-    app.drumKit.add(app.crashCymbol)
-
-
-def keyPressed(app, event):
-
-    if event.key == 'Up':
-        app.scale  += .05
-
-        for object in app.drumKit:
-            object.scaleObject(app.scale)
-
-    if event.key == 'Down':
-        if not app.scale  - .05 < 0:
-            app.scale  -= .05
-
-            for object in app.drumKit:
-                object.scaleObject(app.scale)
-
-    if app.scale  > 1.19:
-        app.scale  = 1.19
-        for object in app.drumKit:
-            object.scaleObject(app.scale)
-
-def timerFired(app):
-
-    #.scale += .1
-
-    if app.scale  > 1.19:
-        app.scale  = 1.19
-
-def redrawAll(app, canvas):
-
-    #canvas.create_image(.width / 2, (.height / 2)-40, image=ImageTk.PhotoImage(.img))
-
-    canvas.create_rectangle(0,0, app.width, app.height, fill='GRAY')
-
-    #OBJECTS===============================
-    for object in app.drumKit:
-            object.drawObject(canvas)
-
-
-    #======================================
-    #circle guide
-    canvas.create_oval(1450+130.9, 333.2+47.59, 1450-130.9, 333.2-47.59, width=10, outline='pink')
-
-    canvas.create_oval(260+130.9, 452.2+47.59, 260-130.9, 452.2-47.59, width=10, outline='purple')
-
-    canvas.create_oval(260+130.9, 452.2+47.59, 260-130.9, 452.2-47.59, width=10, outline='purple')
-
-    canvas.create_oval(500+130.9, 833.0+47.59, 500-130.9, 833-47.59, width=10, outline='#DEE5E5')
-
-    canvas.create_oval(1260+178.5, 797.3+95.19, 1260-178.5, 797.3-95.19, width=10, outline='#DEE5E5')
-    canvas.create_oval(1000+130.9, 595+95.19, 1000-130.9, 595-95.19, width=10, outline='#DEE5E5')
-    canvas.create_oval(700+130.9, 595.0+95.19, 700-130.9, 595-95.19, width=10, outline='#DEE5E5')
-
+def checkStatus(app, currTime):
     pass
 
+def drawObjects(app, canvas):
 
-def main():
-    runApp(width = 1920, height = 1200)
+    for beat in app.beatsOnScreen:
+        beat.drawObject(app, canvas)
 
-if __name__ == "__main__":
-    main()
+
+def destroyObjects(app):
+
+    if len(app.beatsOnScreen) <= 0: return
+    beatsTimeInSeconds = round(app.beatsOnScreen[0].timeStampSeconds, 3)
+
+    if beatsTimeInSeconds < app.songTime+.05 and beatsTimeInSeconds > app.songTime:
+        
+        try:
+            if app.beatsOnScreen[0].checkHit(app.redStick[0], app.redStick[1], app.blueStick[0], app.blueStick[1]):
+                app.combo += 1
+                app.earlyHits += 1
+                if app.combo not in app.comboDict:
+                    app.comboDict[app.combo] = 0
+                else:
+                    app.comboDict[app.combo] += 1
+
+                app.beatsOnScreen.pop(0)
+                return
+
+            else:
+                pass
+
+        except:
+            pass
+        
+    if round(app.beatsOnScreen[0].timeStampSeconds, 3) == app.songTime:
+        
+        try:
+            if app.beatsOnScreen[0].checkHit(app.redStick[0], app.redStick[1], app.blueStick[0], app.blueStick[1]):
+                app.combo += 1
+                app.perfectHits += 1
+                if app.combo not in app.comboDict:
+                    app.comboDict[app.combo] = 0
+                else:
+                    app.comboDict[app.combo] += 1
+
+                app.beatsOnScreen.pop(0)
+                return
+
+            else:
+                pass
+
+        except:
+            pass
+        
+    if round(app.beatsOnScreen[0].timeStampSeconds, 3) < app.songTime-.02:
+        
+        try:
+            if app.beatsOnScreen[0].checkHit(app.redStick[0], app.redStick[1], app.blueStick[0], app.blueStick[1]):
+                app.combo += 1
+                if app.combo not in app.comboDict:
+                    app.comboDict[app.combo] = 0
+                else:
+                    app.comboDict[app.combo] += 1
+                app.lateHits += 1
+
+            else:
+                app.misses += 1
+                if app.longestCombo < app.combo:
+                    app.longestCombo = app.combo
+                app.combo = 0
+                pass
+
+        except:
+            app.misses += 1
+            if app.longestCombo < app.combo:
+                app.longestCombo = app.combo
+            app.combo = 0
+            pass
+        app.beatsOnScreen.pop(0)
+    
+
+def scale(app):
+    for beat in app.beatsOnScreen:
+        beat.grow()
+
+
+
+
+
+def soundOff(app):
+    return
+    
+    index = 0
+    for beat in app.beatsOnScreen:
+        if round(beat.timeStampSeconds, 3) <= app.songTime +.015 and round(beat.timeStampSeconds, 3) >= app.songTime and beat.havePlayed == False:
+            
+
+            
+
+            app.beatsOnScreen.pop(index)
+            index -= 1
+            #beat.changeStatus()
+
+        index += 1
+    
+    pass
+    
+
+
+        
