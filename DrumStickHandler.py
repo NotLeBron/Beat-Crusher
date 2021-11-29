@@ -12,8 +12,8 @@ class DrumStick(object):
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1200)
         
 
-        cv2.namedWindow('controls', cv2.WINDOW_AUTOSIZE)
-        cv2.resizeWindow('controls',500, 500)
+        """cv2.namedWindow('controls', cv2.WINDOW_AUTOSIZE)
+        cv2.resizeWindow('controls',500, 500)"""
         """cv2.createTrackbar('rm','controls',167,255,self.nothing)
         cv2.createTrackbar('gm','controls',118,255,self.nothing)
         cv2.createTrackbar('bm','controls',0,255,self.nothing)
@@ -48,7 +48,11 @@ class DrumStick(object):
         contours = [self.blueStickContour, self.redStickContour]
 
         try:
+            #light
+            #self.frame = self.processFrame(frame)
 
+
+            #object
             self.frame = cv2.drawContours(frame,contours[0],0,(0,255,0),2)
             self.frame = cv2.drawContours(frame,contours[1],0,(0,255,0),2)
         except:
@@ -60,6 +64,7 @@ class DrumStick(object):
         return self.frame
 
     def filterFrame(self, color, rawFrame, colorMin, colorMax):
+        #https://docs.opencv.org/4.x/d2/d96/tutorial_py_table_of_contents_imgproc.html
         if rawFrame is None:return
         hsvFrame = cv2.cvtColor(rawFrame, cv2.COLOR_BGR2HSV)
 
@@ -117,7 +122,7 @@ class DrumStick(object):
             nbox = np.int0(box)
             boxArea = self.getPolyArea(nbox)
 
-            if boxArea > 2500:
+            if boxArea > 3000:
                 #cv2.drawContours(newFrame,[nbox],0,(0,255,0),2)
 
                 if color == 'red':
@@ -138,6 +143,51 @@ class DrumStick(object):
         
         return newFrame
 
+    def processFrame(self, frame):
+
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+        #remove everything but bright white light
+        bwFrame = cv2.threshold(frame, 250, 255, cv2.THRESH_BINARY)[1]
+        
+        #erode away at the edges of light
+        erodedFrame = cv2.erode(bwFrame,None,iterations=5)
+
+        #decreases size of lights
+        dilatedFrame = cv2.dilate(erodedFrame,None,iterations=5)
+
+        
+
+
+        #draws circle around light spots
+        contours, hierarchy = cv2.findContours(image=dilatedFrame, mode=cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE)
+        finalImg = dilatedFrame.copy()
+        finalImg = cv2.cvtColor(finalImg, cv2.COLOR_GRAY2BGR) 
+
+        try:
+            largestContour = max(contours, key = cv2.contourArea)
+            rect = cv2.minAreaRect(largestContour)
+            box = cv2.boxPoints(rect) 
+            nbox = np.int0(box)
+            boxArea = self.getPolyArea(nbox)
+
+            if boxArea > 3000:
+                cv2.drawContours(finalImg,[nbox],0,(0,255,0),2)
+
+                return finalImg
+
+
+            elif boxArea > 100:
+                #print('weak SIGNAL - RED STICK')
+                pass
+
+        except:
+            pass
+
+
+
+
+        cv2.drawContours(image=finalImg, contours=self.contours, contourIdx=-1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
 
     def getPolyArea(self, poly):
         #https://keisan.casio.com/exec/system/1322718857   formula for area of inscribed quad 
@@ -165,19 +215,47 @@ class DrumStick(object):
     def getRedStickTip(self):
         if self.redStickContour is None: return
 
-        avgX = (self.redStickContour[0][1][0] + self.redStickContour[0][2][0])/2
-        avgY = (self.redStickContour[0][1][1] + self.redStickContour[0][2][1])/2
+        
+        #[array][point][x or y] .......0 required for array
+        avgX = (self.redStickContour[0][0][0] + self.redStickContour[0][1][0])/2
+        avgY = (self.redStickContour[0][0][1] + self.redStickContour[0][1][1])/2
 
-        return (avgX, avgY)
+        avgX2 = (self.redStickContour[0][2][0] + self.redStickContour[0][3][0])/2
+        avgY2 = (self.redStickContour[0][2][1] + self.redStickContour[0][3][1])/2
 
-    def getBlueStick(self):
+        absX = (avgX + avgX2) /2
+        absY = min(float(avgY) , float(avgY2))
 
-        if self.redStickContour is None: return
 
-        avgX = (self.redStickContour[1][1][0] + self.redStickContour[1][2][0])/2
-        avgY = (self.redStickContour[1][1][1] + self.redStickContour[1][2][1])/2
+        """print(self.redStickContour, 'step1')
+        print(self.redStickContour[0], 'step2')
+        print(self.redStickContour[0][0], 'step3')
+        print(self.redStickContour[0][0][0], 'step4')"""
 
-        return (avgX, avgY)
+        return (absX, absY)
+
+    def getBlueStickTip(self):
+
+        if self.blueStickContour is None: return
+
+        
+        #[array][point][x or y] .......0 required for array
+        avgX = (self.blueStickContour[0][0][0] + self.blueStickContour[0][1][0])/2
+        avgY = (self.blueStickContour[0][0][1] + self.blueStickContour[0][1][1])/2
+
+        avgX2 = (self.blueStickContour[0][2][0] + self.blueStickContour[0][3][0])/2
+        avgY2 = (self.blueStickContour[0][2][1] + self.blueStickContour[0][3][1])/2
+
+        absX = (avgX + avgX2) /2
+        absY = min(float(avgY) , float(avgY2))
+
+
+        """print(self.redStickContour, 'step1')
+        print(self.redStickContour[0], 'step2')
+        print(self.redStickContour[0][0], 'step3')
+        print(self.redStickContour[0][0][0], 'step4')"""
+
+        return (absX, absY)
 
 
     def sameRatioResize(self, frame, width, height):
@@ -196,9 +274,3 @@ class DrumStick(object):
             
 
         pass
-
-
-
-
-
-
