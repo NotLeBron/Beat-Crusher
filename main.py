@@ -20,20 +20,36 @@ def appStarted(app):
     app.heightRad = 40
 
     app.playShadow = True
-    app.timerDelay = 500
+    app.scoreShadow = True
+    app.settingShadow = True
+    app.backShadow = True
+
+
+    app.timerDelay = 1
     app.menuState = 1
 
     app.backx = app.width//2 - 800
     app.backy = app.height//2 +400
 
     app.backXRad = 100
+    app.currTime = 0
+    app.scorePause = False #for click animation
+    app.playPause = False #for click animation
+    app.settingPause = False #for click animation
+    app.backPause = False #for click animation
+
+    app.showCam = True
+    app.defaultSong = 'Smells Like Teen Spirit'
+    app.scoresToDisplay = []
+
+    scoreDisplayInit(app)
 
     #app.timerDelay = 500
 
 def gameStarted(app):
     app.mode = 'game'
-    app.defualtSong = 'Smells Like Teen Spirit'
-    #app.defualtSong = 'Boulevard of Broken Dreams'
+    #app.defaultSong = 'Smells Like Teen Spirit'
+    #app.defaultSong = 'Boulevard of Broken Dreams'
     app.gameState = 1
     if app.gameState == 1:
         app.drumstick = DrumStick()
@@ -41,7 +57,7 @@ def gameStarted(app):
 
         app.drumAudio = DrumAudioHandler(app)
 
-        app.totalBeats = songInfo.getTotalBeats(app.defualtSong)
+        app.totalBeats = songInfo.getTotalBeats(app.defaultSong)
 
         app.redStick = ()
         app.blueStick = ()
@@ -57,8 +73,8 @@ def gameStarted(app):
 
         app.isCountDown = False
 
-        app.song = Song(app.defualtSong)
-        app.beatQ = BeatQueue(app.defualtSong, 2)
+        app.song = Song(app.defaultSong)
+        app.beatQ = BeatQueue(app.defaultSong, 2)
         app.beatsOnScreen = []
         app.currBeat = 0
         app.songOffset = 1
@@ -120,8 +136,6 @@ def gameStarted(app):
         app.phase4 = False
         app.phase5 = False
 
-
-
 def gameThreadInit(app):
     for i in range(app.maxThreads):
             t = threading.Thread(target=worker, args=(app,))
@@ -129,7 +143,6 @@ def gameThreadInit(app):
             t.setDaemon(True)
             t.start()
             app.threads.append(t)
-
 
 def updateSongTime(app):
     app.songTime = app.song.getSongTime()
@@ -146,7 +159,7 @@ def updateScore(app):
     app.score = (app.perfectHits*1000) + (app.earlyHits*100) + (app.lateHits*100) + (sum(app.comboDict.values()) * 50)
 
 def checkGameOver(app):
-    if app.songProgress <= 1 and app.songProgress >= .98:
+    if app.songProgress <= 1 and app.songProgress >= .999:
         cv2.destroyAllWindows()
         app.drumstick.capture.release()
         app.song.stop()
@@ -178,6 +191,19 @@ def calcGrade(app):
             else:
                 percent -= .04
         i += 1
+    
+    temp = None
+    if app.defaultSong == 'Smells Like Teeen Spirit':
+        temp = 0
+    elif app.defaultSong == 'Boulevard of Broken Dreams':
+        temp = 1
+
+    file = open("Resources/Scores/scores.txt", "a")
+
+    file.write(f'{app.grade} {temp} {app.score}\n')
+
+
+    file.close
 
 def loadingSequence(app):
     if not app.isCountDown and not app.isLoading: return False
@@ -317,7 +343,7 @@ def game_keyPressed(app, event):
 
 def addBeats(app):
     if len(app.beatsOnScreen) < 10:
-        defualt = 60000/(115*384)
+        default = 60000/(115*384)
 
         if app.currBeat in app.beatQ.mainMap:
 
@@ -395,7 +421,6 @@ def drawGrade(app, canvas):
         newSize = int(1920*2*app.gradeScale)
         canvas.create_text(hitx+1150, 400, text=f"{app.grade}", anchor='center', font=f'Algerian {newSize}')
 
-
 def drawGameOverScreen(app, canvas):
     canvas.create_text(app.width//2, app.height*(1/9), text='GAME OVER', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
@@ -437,7 +462,6 @@ def drawCamera(app, canvas):
     if app.copyFrame is None: return
     canvas.create_image(app.width -250, app.height -140, image=app.copyFrame)
 
-
 def game_redrawAll(app, canvas):
 
     if app.gameState == 1:
@@ -454,7 +478,8 @@ def game_redrawAll(app, canvas):
             drawCombo(app, canvas)
             drawProgressBar(app, canvas)
             drawCamera(app, canvas)
-            drawStick(app, canvas)
+            if app.showCam:
+                drawStick(app, canvas)
             
 
     elif app.gameState ==2:
@@ -475,8 +500,6 @@ def game_appStopped(app):
 #MENU =======================================================================================================================
 #============================================================================================================================
 def menu_mousePressed(app, event):
-
-
     if app.menuState == 1:
         #play target zone
         #X: top left (app.buttonX - app.widthRad) --> bot right (app.buttonx + app.widthRad)
@@ -486,37 +509,77 @@ def menu_mousePressed(app, event):
         if (event.x > (app.buttonX - app.widthRad) and event.x < (app.buttonX + app.widthRad) and
             event.y > (app.playY - app.heightRad) and event.y < (app.playY + app.heightRad)):
 
-            #print(True)
             app.playShadow=False
-            app.timerDelay = 1000
-            gameStarted(app)
+            app.currTime = time.time()
+            app.playPause = True
 
         #score detector
         if (event.x > (app.buttonX - app.widthRad) and event.x < (app.buttonX + app.widthRad) and
             event.y > (app.scoresY - app.heightRad) and event.y < (app.scoresY + app.heightRad)):
 
-            #print(True)
             app.scoreShadow=False
-            app.timerDelay = 1000
-            app.menuState = 2
+            app.currTime = time.time()
+            app.scorePause = True
 
         #settings detector
         if (event.x > (app.buttonX - app.widthRad) and event.x < (app.buttonX + app.widthRad) and
             event.y > (app.settingsY - app.heightRad) and event.y < (app.settingsY + app.heightRad)):
 
-            #print(True)
-            app.scoreShadow=False
-            app.timerDelay = 1000
-            app.menuState = 3
+            app.settingShadow=False
+            app.currTime = time.time()
+            app.settingPause = True
 
+    else:
+        if app.menuState == 3:
+            #show cam
+            if (event.x > (805) and event.x < (835) and
+                event.y > (297) and event.y < (327)):
+                app.showCam = True if app.showCam == False else False
 
-    if (event.x > (app.backx - app.backXRad) and event.x < (app.backx + app.backXRad) and
-        event.y > (app.backy - app.heightRad) and event.y < (app.backy + app.heightRad)):
-        app.scoreShadow=False
-        app.timerDelay = 1000
-        app.menuState = 1
+            #song choice 1
+            if (event.x > (app.width//4 + 75-15) and event.x < (app.width//4 + 75+15) and
+                event.y > (425-15) and event.y < (425+15)):
+                app.defaultSong = 'Smells Like Teen Spirit'
+                print('song1')
+
+            #song choice 2
+            if (event.x > (app.width//4 + 75-15) and event.x < (app.width//4 + 75+15) and
+                event.y > (475-15) and event.y < (475+15)):
+                app.defaultSong = 'Boulevard of Broken Dreams'
+
+        if (event.x > (app.backx - app.backXRad) and event.x < (app.backx + app.backXRad) and
+            event.y > (app.backy - app.heightRad) and event.y < (app.backy + app.heightRad)):
+            app.backShadow=False
+            app.currTime = time.time()
+            app.backPause = True
 
 def menu_timerFired(app):
+    if app.playPause:
+        if time.time() - app.currTime > .2:
+            app.playPause = False
+            app.playShadow= True
+            gameStarted(app)
+
+    if app.scorePause:
+        if time.time() - app.currTime > .15:
+            app.scorePause = False
+            app.scoreShadow= True
+            app.menuState = 2
+
+    if app.settingPause:
+        if time.time() - app.currTime > .15:
+            app.settingPause = False
+            app.settingShadow= True
+            app.menuState = 3
+
+    if app.backPause:
+        if time.time() - app.currTime > .15:
+            app.backPause = False
+            app.backShadow= True
+            app.menuState = 1
+
+    
+
     app.playShadow=True
     pass
 
@@ -525,7 +588,7 @@ def drawMenuScreen(app, canvas):
     #font name: groOvEd PERSONAL USE
     canvas.create_rectangle(0, 0, app.width, app.height, fill='#407076')
 
-    canvas.create_text(app.width//2, app.height*(1/9), text='BEAT SMASHER', anchor='center', font='Algerian 80 bold')
+    canvas.create_text(app.width//2, app.height*(1/9), text='BEAT CRUSHER', anchor='center', font='Algerian 80 bold')
 
 
     #play button
@@ -535,18 +598,78 @@ def drawMenuScreen(app, canvas):
     canvas.create_text(app.buttonX, app.playY, text='Play', anchor='center', font='Algerian 30 bold')
 
     #scores button
-    canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.scoresY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.scoresY+app.heightRad+app.shadowShift, fill='black')
+    if app.scoreShadow == True:
+        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.scoresY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.scoresY+app.heightRad+app.shadowShift, fill='black')
     canvas.create_rectangle(app.buttonX-app.widthRad, app.scoresY-app.heightRad, app.buttonX+app.widthRad, app.scoresY+app.heightRad, fill='white')
     canvas.create_text(app.buttonX, app.scoresY, text='Scores', anchor='center', font='Algerian 30 bold')
 
     #settings button
-    canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.settingsY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.settingsY+app.heightRad+app.shadowShift, fill='black')
+    if app.settingShadow == True:
+        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.settingsY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.settingsY+app.heightRad+app.shadowShift, fill='black')
     canvas.create_rectangle(app.buttonX-app.widthRad, app.settingsY-app.heightRad, app.buttonX+app.widthRad, app.settingsY+app.heightRad, fill='white')
     canvas.create_text(app.buttonX, app.settingsY, text='Settings', anchor='center', font='Algerian 30 bold')
+
+def scoreDisplayInit(app):
+    filepath = 'Resources/Scores/scores.txt'
+
+    try:
+        file = open(filepath)
+    except:
+
+        return
+
+    
+    scoresList = []
+    entries = []
+    with open(filepath) as scores:
+            for  index, line in enumerate(scores):
+                line = line.strip() 
+                
+                splitLine = line.split(' ')
+
+                scoresList.append(int(splitLine[2]))
+                entries.append((splitLine[0], int(splitLine[1]), int(splitLine[2]) ) )
+
+    scoresList = sorted(scoresList, reverse=True)
+    print(scoresList)
+    
+    if len(scoresList) > 10:
+        scoresList = scoresList[0:9]
+        
+    for score in scoresList:
+        for entry in entries:
+            if score in entry:
+                
+                app.scoresToDisplay.append(entry)
+                entries.pop(entries.index(entry))
+
+                break
+
+    print(app.scoresToDisplay)
 
 def drawScoreScreen(app, canvas):
     canvas.create_text(app.width//2, app.height*(1/9), text='High Scores', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
+
+    gradeX = 320
+    songX = 920
+    scoreX = 1520
+    y = 300
+    for entry in app.scoresToDisplay:
+        song= ''
+        if entry[1] == 0:
+            song = 'Smells Like Teen Spirit'
+        
+        elif entry[1] == 1:
+            song = 'Boulevard of Broken Dreams'
+
+        canvas.create_text(songX, y, text=f'{song}', anchor='center', font='Algerian 20 ')
+        canvas.create_text(gradeX, y, text=f'{entry[0]}', anchor='center', font='Algerian 20 ')
+        canvas.create_text(scoreX, y, text=f'{entry[2]}', anchor='center', font='Algerian 20 ')
+
+        y += 50
+
+
 
     drawBackBtn(app, canvas)
 
@@ -554,11 +677,38 @@ def drawSettingScreen(app, canvas):
     canvas.create_text(app.width//2, app.height*(1/9), text='Settings', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
 
+    canvas.create_text(app.width//4, 300, text='Show Camera In-game - ', anchor='nw', font='Algerian 20 ')
+    rad = 15
+    checked = ''
+    checked = 'black' if app.showCam == True else 'white'
+    x =820
+    y = 312
+    canvas.create_rectangle(x-rad, y-rad, x+rad, y+rad, fill=checked)
+
+
+    canvas.create_text(app.width//4, 375, text='Song Selection:', anchor='nw', font='Algerian 20 ')
+    x=app.width//4 + 100
+    y=425
+    song1checked = ''
+    song1checked = 'black' if app.defaultSong == 'Smells Like Teen Spirit' else 'white'
+    canvas.create_text(x, y, text='Smells Like Teen Spirit', anchor='w', font='Algerian 15 ')
+    x=app.width//4 + 75
+    canvas.create_rectangle(x-rad, y-rad, x+rad, y+rad, fill=song1checked)
+    y = 475
+
+    x=app.width//4 + 100
+    song2checked = ''
+    song2checked = 'black' if app.defaultSong == 'Boulevard of Broken Dreams' else 'white'
+    canvas.create_text(x, y, text='Boulevard of Broken Dreams', anchor='w', font='Algerian 15 ')
+    x=app.width//4 + 75
+    canvas.create_rectangle(x-rad, y-rad, x+rad, y+rad, fill=song2checked)
+
+
     drawBackBtn(app, canvas)
 
 def drawBackBtn(app, canvas):
-
-    canvas.create_rectangle(app.backx-app.backXRad+app.shadowShift, app.backy-app.heightRad+app.shadowShift, app.backx+app.backXRad+app.shadowShift, app.backy+app.heightRad+app.shadowShift, fill='black')
+    if app.backShadow:
+        canvas.create_rectangle(app.backx-app.backXRad+app.shadowShift, app.backy-app.heightRad+app.shadowShift, app.backx+app.backXRad+app.shadowShift, app.backy+app.heightRad+app.shadowShift, fill='black')
     canvas.create_rectangle(app.backx-app.backXRad, app.backy-app.heightRad, app.backx+app.backXRad, app.backy+app.heightRad, fill='white')
     canvas.create_text(app.backx, app.backy, text='Back', anchor='center', font='Algerian 30 bold')
 
@@ -575,7 +725,7 @@ def menu_redrawAll(app, canvas):
 def updateTopScores(app, score):
 
     file = open("TopScores.txt", "w")
-    file.write(app.defualtSong +  str(score) + "\n")
+    file.write(app.defaultSong +  str(score) + "\n")
 
 
 

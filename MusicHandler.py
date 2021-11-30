@@ -56,6 +56,9 @@ class Song(object):
     def getSongLength(self):
         if self.name == 'Smells Like Teen Spirit':
             temp = pygame.mixer.Sound('Resources/Songs/Smells like Teen Spirit.wav')
+
+        elif self.name == 'Boulevard of Broken Dreams':
+            temp = pygame.mixer.Sound('Resources/Songs/Boulevard of Broken Dreams.wav')
         return temp.get_length()
 
 class BeatQueue(object):
