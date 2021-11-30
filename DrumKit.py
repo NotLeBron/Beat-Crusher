@@ -19,12 +19,14 @@ class DrumPiece(object):
 
         #changes with framerate (game performance)
         #if performance dips (framerate goes down) objects should grow faster to compensate and vice versa
-        #not perfect but pretty accurate - FIX LATER
+        #not perfect - slow to fix animation synchronization
+        #TODO: 
         if fps > 5:
-            self.growthRate = self.calcGrowthRate() /(16 - 16/fps)
+            self.growthRate = self.calcGrowthRate() /(19 - 19/fps)
 
         else:
-            self.growthRate = self.calcGrowthRate() /(16 - 16/5)
+            #first few seconds framerate will be inacurrate until it averages out
+            self.growthRate = self.calcGrowthRate() /(19 - 19/5)
 
 
         if types == 'hihat':
@@ -454,32 +456,32 @@ def scale(app):
 def checkKickDrum(app):
     """Bass drum backtrack, slightly off """
 
-
-    beatInSeconds = (app.beatQ.kickBeatMap[0][0] * app.song.getTicksPerSec())/1000 + app.song.offset
-    
-
-    """diff = app.songTime - beatInSeconds
-
-    if diff <= .027 and diff >= -.027:
-        print(beatInSeconds, app.songTime)
-        app.drumAudio.addWork('kick')
-        app.beatQ.kickBeatMap.pop(0)
-
-    elif diff > .027:
-        print(beatInSeconds, app.songTime)
-        app.beatQ.kickBeatMap.pop(0)
-        print('missed')"""
-
-
-    if round(beatInSeconds, 3)  >= app.songTime-.04 and round(beatInSeconds, 3) <= app.songTime +.02:
-        app.drumAudio.addWork('kick')
-        app.beatQ.kickBeatMap.pop(0)
+    if len(app.beatQ.kickBeatMap) > 0:
+        beatInSeconds = (app.beatQ.kickBeatMap[0][0] * app.song.getTicksPerSec())/1000 + app.song.offset
         
 
-    elif round(beatInSeconds, 3) < app.songTime-.04:
-        app.drumAudio.addWork('kick')
-        app.beatQ.kickBeatMap.pop(0)
-        print('missed')
+        """diff = app.songTime - beatInSeconds
+
+        if diff <= .027 and diff >= -.027:
+            print(beatInSeconds, app.songTime)
+            app.drumAudio.addWork('kick')
+            app.beatQ.kickBeatMap.pop(0)
+
+        elif diff > .027:
+            print(beatInSeconds, app.songTime)
+            app.beatQ.kickBeatMap.pop(0)
+            print('missed')"""
+
+
+        if round(beatInSeconds, 3)  >= app.songTime-.04 and round(beatInSeconds, 3) <= app.songTime +.02:
+            app.drumAudio.addWork('kick')
+            app.beatQ.kickBeatMap.pop(0)
+            
+
+        elif round(beatInSeconds, 3) < app.songTime-.04:
+            app.drumAudio.addWork('kick')
+            app.beatQ.kickBeatMap.pop(0)
+            print('missed')
         
 
 
