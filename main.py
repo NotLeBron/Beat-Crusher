@@ -5,6 +5,7 @@ import time, threading, pygame, queue
 from MusicHandler import *
 
 import DrumKit
+from DrumAudio import DrumAudioHandler
 
 
 def appStarted(app):
@@ -38,6 +39,8 @@ def gameStarted(app):
         app.drumstick = DrumStick()
         app.frame = None
 
+        app.drumAudio = DrumAudioHandler(app)
+
         app.totalBeats = songInfo.getTotalBeats(app.defualtSong)
 
         app.redStick = ()
@@ -58,24 +61,20 @@ def gameStarted(app):
         app.beatQ = BeatQueue(app.defualtSong, 2)
         app.beatsOnScreen = []
         app.currBeat = 0
-        app.songOffset = 0
+        app.songOffset = 1
 
 
 
         app.lock = threading.Lock()
         app.camThread = camThread(app)
-        #app.gameThread = gameThread(app)
         app.camThread.start()
-        #app.gameThread.start()
 
         
-
-        pygame.mixer.set_num_channels(50)
         app.sound1 = pygame.mixer.Sound("Resources/Audio files/hihat.mp3")
         app.sound2 = pygame.mixer.Sound("Resources/Audio files/snare.mp3")
 
         app.q = queue.LifoQueue()
-        app.maxThreads = 10
+        app.maxThreads = 14
         app.songProgress = 0
         app.songTime = 0
         
@@ -105,12 +104,32 @@ def gameStarted(app):
 
         app.threads = []
 
+        gameThreadInit(app)
 
 
-    else:
+        #gameOver stuff
+        app.gradeScale = 1
+        app.textScale = 1
+        app.scoreTextScale = 1
+        app.hitTextScale = 1
+        app.accTextScale = 1
+        app.comboTextScale = 1
+        app.phase1 = True
+        app.phase2 = False
+        app.phase3 = False
+        app.phase4 = False
+        app.phase5 = False
 
-        pass
+
     
+def gameThreadInit(app):
+    for i in range(app.maxThreads):
+            t = threading.Thread(target=worker, args=(app,))
+            t.name = f'Game Thread {i}'
+            t.setDaemon(True)
+            t.start()
+            app.threads.append(t)
+
 
 def updateSongTime(app):
     app.songTime = app.song.getSongTime()
@@ -160,9 +179,6 @@ def calcGrade(app):
                 percent -= .04
         i += 1
 
-
-
-
 def loadingSequence(app):
     if not app.isCountDown and not app.isLoading: return False
     if app.ellipses > 3:
@@ -185,9 +201,9 @@ def loadingSequence(app):
             app.songStartTime = time.time() - app.songOffset
             app.song.play()
 
-            app.jobList = [checkGameOver, updateSongTime, updateScore, updateAccuracy, addBeats, 
-                        updateSongProgress, app.song.updateSongPosition, DrumKit.destroyObjects, 
-                        DrumKit.soundOff, DrumKit.scale ]
+            app.jobList = [checkGameOver, updateSongTime, updateScore, updateAccuracy,  addBeats, DrumKit.checkKickDrum,
+                        updateSongProgress, app.song.updateSongPosition, DrumKit.destroyObjects, app.drumAudio.executeWork, 
+                        DrumKit.scale ]
 
             app.startFPSTracker = True
         
@@ -222,10 +238,6 @@ def updateFPS(app):
         app.frameCount = 0
 
 def game_timerFired(app):
-
-    
-
-   
     if app.gameState == 1:
         if app.startFPSTracker == True:
 
@@ -233,10 +245,7 @@ def game_timerFired(app):
             updateFPS(app)
 
 
-        for i in range(app.maxThreads):
-            t = threading.Thread(target=worker, args=(app,))
-            t.start()
-            app.threads.append(t)
+       
 
 
         for item in app.jobList:
@@ -245,23 +254,41 @@ def game_timerFired(app):
         # block until all tasks are done
         app.q.join()
 
+    elif app.gameState == 2:
+
+        if app.phase1:
+            if app.hitTextScale > .009:
+                app.hitTextScale -= .01
+            else:
+                app.phase2 = True
+                app.hitTextScale = .009
+
+        if app.phase2:
+            if app.accTextScale > .009:
+                app.accTextScale -= .01
+            else:
+                app.phase3 = True
+                app.accTextScale = .009
+
+        if app.phase3:
+            if app.comboTextScale > .009:
+                app.comboTextScale -= .01
+            else:
+                app.phase4 = True
+                app.comboTextScale = .009
+
+        if app.phase4:
+            if app.scoreTextScale > .0196:
+                app.scoreTextScale -= .01
+            else:
+                app.phase5 = True
+                app.scoreTextScale = .0196
             
-        """if loadingSequence(app): return
-        
+            pass
 
-        updateAccuracy(app)
-
-        
-        #print('My: ', getSongTime(app), 'Pygame: ', app.song.getSongTime())
-        #app.song.updateSongPosition(getSongTime(app))
-        addBeats(app)
-        #DrumKit.checkStatus(app, getSongTime(app))
-        DrumKit.destroyObjects(app, app.song.getSongTime())
-        DrumKit.soundOff(app, getSongTime(app), app.currBeat)
-        DrumKit.scale(app)"""
-    else:
-
-        pass
+        if app.phase5:
+            if app.gradeScale > .1:
+                app.gradeScale -= .1/10
 
 def updateAccuracy(app):
     try:
@@ -272,25 +299,20 @@ def updateAccuracy(app):
 
 def game_mousePressed(app, event):
     if app.gameState == 1:
-        pygame.mixer.Channel(1).play(app.sound1)
-        pygame.mixer.Channel(5).play(app.sound2)
         pass
-        #app.song.cymb.play(maxtime=500)
 
 def game_keyPressed(app, event):
 
     if app.gameState == 1:
-        if event.key == 'Space':
-            pygame.mixer.Channel(0).play(app.sound1)
-
-        if event.key == 'c':
-            pygame.mixer.Channel(1).play(app.sound2)
-
-        if event.key == 'x':
-            pygame.mixer.Channel(3).play(app.sound2)
-
         if event.key == 'z':
             calcGrade(app)
+            try:
+                app.song.stop()
+                cv2.destroyAllWindows()
+                app.drumstick.capture.release()
+
+            except:
+                pass
             app.gameState = 2
 
 def addBeats(app):
@@ -298,6 +320,7 @@ def addBeats(app):
         defualt = 60000/(115*384)
 
         if app.currBeat in app.beatQ.mainMap:
+        
 
             if app.beatQ.mainMap[app.currBeat][1] == 'cymb':
                 app.beatsOnScreen.append(DrumKit.createObject(app.beatQ.mainMap[app.currBeat][0], 'cymb', app.song.getSongTime(), app.song.name,app.avgFPS) )
@@ -365,50 +388,50 @@ def drawGuideCircles(app, canvas):
     canvas.create_oval(1000-130.9, 595-95.19, 1000+130.9, 595+95.19, width=10, outline='green')
     canvas.create_oval(700-130.9, 595.0-95.19, 700+130.9, 595+95.19, width=10, outline='orange')
 
+def drawGrade(app, canvas):
+
+    if app.phase5:
+        hitx = 200
+        newSize = int(1920*2*app.gradeScale)
+        canvas.create_text(hitx+1150, 400, text=f"{app.grade}", anchor='center', font=f'Algerian {newSize}')
+
+
 def drawGameOverScreen(app, canvas):
     canvas.create_text(app.width//2, app.height*(1/9), text='GAME OVER', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
 
+    if app.phase4:
+        scoreText = 'SCORE: ' + str(app.score)
+        scoreFontSize = int(3840 *app.scoreTextScale) #75 normal
+        canvas.create_text(150, 350, text=f'SCORE: {app.score}', anchor='nw', font=f'Algerian {scoreFontSize} ')
+        #canvas.create_line(150, 420, len(scoreText)*scoreFontSize-130, 420, width=2)
 
-    scoreText = 'SCORE: ' + str(app.score)
-    scoreFontSize = 75
-    canvas.create_text(150, 300, text=f'SCORE: {app.score}', anchor='nw', font=f'Algerian {scoreFontSize} ')
-    #canvas.create_line(150, 420, len(scoreText)*scoreFontSize-130, 420, width=2)
+    if app.phase1:
+        hitText = 'HITS/MISSES'
+        hitFontSize = int(3840*app.hitTextScale)#normal 35 
+        hitx = 200
+        canvas.create_text(hitx, 700, text=hitText, anchor='nw', font=f'Algerian {hitFontSize}')
+        canvas.create_line(hitx, 760, 525, 760, width=2)
+        SubTextFontSize = 20
+        canvas.create_text(hitx, 810, text=f"-> Total Hits     {app.hits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx, 860, text=f"--------> Perfect Hits     {app.perfectHits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx, 900, text=f"--------> Early Hits         {app.earlyHits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx, 940, text=f"--------> Late Hits            {app.lateHits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
 
-    hitText = 'HITS/MISSES'
-    hitFontSize = 35
-    hitx = 200
-    canvas.create_text(hitx, 600, text=hitText, anchor='nw', font=f'Algerian {hitFontSize}')
-    canvas.create_line(hitx, 660, 525, 660, width=2)
-    SubTextFontSize = 20
-    canvas.create_text(hitx, 710, text=f"-> Total Hits     {app.hits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
-    canvas.create_text(hitx, 760, text=f"--------> Perfect Hits     {app.perfectHits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
-    canvas.create_text(hitx, 800, text=f"--------> Early Hits         {app.earlyHits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
-    canvas.create_text(hitx, 840, text=f"--------> Late Hits            {app.lateHits}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+    if app.phase2:
+        accText = 'Accuracy'
+        accFontSize = int(3840*app.accTextScale)#normal 35
+        canvas.create_text(hitx+660, 730, text=accText, anchor='w', font=f'Algerian {accFontSize}')
+        canvas.create_line(hitx+660, 760, hitx+905, 760, width=2)
+        canvas.create_text(hitx+660, 820, text=f"-> {app.accuracy*100}% Hit Rate", anchor='w', font=f'Algerian {SubTextFontSize}')
 
-
-    accText = 'Accuracy'
-    accFontSize = 35
-    canvas.create_text(hitx+660, 630, text=accText, anchor='w', font=f'Algerian {accFontSize}')
-    canvas.create_line(hitx+660, 660, hitx+905, 660, width=2)
-    acc = 95
-    canvas.create_text(hitx+660, 720, text=f"-> {app.accuracy*100}% Hit Rate", anchor='w', font=f'Algerian {SubTextFontSize}')
-
-    comboText = 'COMBO'
-    comboFontSize = 35
-    canvas.create_text(hitx+660*2, 600, text=comboText, anchor='n', font=f'Algerian {comboFontSize}')
-    canvas.create_line(hitx+1245, 660, hitx+1395, 660, width=2)
-    canvas.create_text(hitx+1245, 710, text=f"-> Combos     {sum(app.comboDict)}x", anchor='w', font=f'Algerian {SubTextFontSize}')
-    canvas.create_text(hitx+1245, 760, text=f"--------> Longest Combo     {app.longestCombo}x", anchor='w', font=f'Algerian {SubTextFontSize}')
-
-
-    canvas.create_text(hitx+1150, 400, text=f"{app.grade}", anchor='center', font=f'Algerian 300')
-
-
-
-
-
-    
+    if app.phase3:
+        comboText = 'COMBO'
+        comboFontSize = int(3840*app.comboTextScale)#normal 35
+        canvas.create_text(hitx+660*2, 700, text=comboText, anchor='n', font=f'Algerian {comboFontSize}')
+        canvas.create_line(hitx+1245, 760, hitx+1395, 760, width=2)
+        canvas.create_text(hitx+1245, 810, text=f"-> Combos     {sum(app.comboDict)}x", anchor='w', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx+1245, 860, text=f"--------> Longest Combo     {app.longestCombo}x", anchor='w', font=f'Algerian {SubTextFontSize}')
 
 def game_redrawAll(app, canvas):
     
@@ -430,10 +453,8 @@ def game_redrawAll(app, canvas):
 
     elif app.gameState ==2:
         drawGameOverScreen(app, canvas)
+        drawGrade(app, canvas)
         pass
-
-
-
 
 def game_appStopped(app):
     cv2.destroyAllWindows()
@@ -535,7 +556,6 @@ def drawBackBtn(app, canvas):
     canvas.create_rectangle(app.backx-app.backXRad, app.backy-app.heightRad, app.backx+app.backXRad, app.backy+app.heightRad, fill='white') 
     canvas.create_text(app.backx, app.backy, text='Back', anchor='center', font='Algerian 30 bold')  
 
-
 def menu_redrawAll(app, canvas):
     if app.menuState == 1:
 
@@ -545,7 +565,6 @@ def menu_redrawAll(app, canvas):
 
     else:
         drawSettingScreen(app, canvas)
-
 
 def updateTopScores(app, score):
 

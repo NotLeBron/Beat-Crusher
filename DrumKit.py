@@ -15,17 +15,17 @@ class DrumPiece(object):
         
         self.timeCreated = timeCreated
         self.scale = scale
+
+
+        #changes with framerate (game performance)
+        #if performance dips (framerate goes down) objects should grow faster to compensate and vice versa
+        #not perfect but pretty accurate - FIX LATER
         if fps > 5:
-            self.growthRate = self.calcGrowthRate() /(15 - 15/fps)
+            self.growthRate = self.calcGrowthRate() /(16 - 16/fps)
 
         else:
-            self.growthRate = self.calcGrowthRate() /(15)
+            self.growthRate = self.calcGrowthRate() /(16 - 16/5)
 
-        self.canHit = False
-
-        
-        
-        
 
         if types == 'hihat':
             self.sound = pygame.mixer.Sound("Resources/Audio files/hihat.mp3")
@@ -45,12 +45,6 @@ class DrumPiece(object):
         elif types == 'cymb':
             self.sound = pygame.mixer.Sound("Resources/Audio files/cymb.mp3")
 
-
-        self.bassDrum = pygame.mixer.Sound("Resources/Audio files/bassDrum.mp3")
-        self.cymb = pygame.mixer.Sound("Resources/Audio files/cymb.mp3")
-
-
-        self.isActive = True
 
     def calcGrowthRate(self):
 
@@ -108,7 +102,8 @@ class DrumPiece(object):
     def scaleObject(self, scale):
         self.scale = scale
 
-
+    def getName(self):
+        return self.types
 
     def drawObject(self, app, canvas):
 
@@ -392,7 +387,8 @@ def destroyObjects(app):
                     app.comboDict[app.combo] = 0
                 else:
                     app.comboDict[app.combo] += 1
-
+                
+                app.drumAudio.addWork(app.beatsOnScreen[0].getName())
                 app.beatsOnScreen.pop(0)
                 return
 
@@ -413,6 +409,7 @@ def destroyObjects(app):
                 else:
                     app.comboDict[app.combo] += 1
 
+                app.drumAudio.addWork(app.beatsOnScreen[0].getName())
                 app.beatsOnScreen.pop(0)
                 return
 
@@ -446,6 +443,7 @@ def destroyObjects(app):
                 app.longestCombo = app.combo
             app.combo = 0
             pass
+        app.drumAudio.addWork(app.beatsOnScreen[0].getName())
         app.beatsOnScreen.pop(0)
     
 
@@ -453,28 +451,37 @@ def scale(app):
     for beat in app.beatsOnScreen:
         beat.grow()
 
+def checkKickDrum(app):
+    """Bass drum backtrack, slightly off """
 
 
-
-
-def soundOff(app):
-    return
+    beatInSeconds = (app.beatQ.kickBeatMap[0][0] * app.song.getTicksPerSec())/1000 + app.song.offset
     
-    index = 0
-    for beat in app.beatsOnScreen:
-        if round(beat.timeStampSeconds, 3) <= app.songTime +.015 and round(beat.timeStampSeconds, 3) >= app.songTime and beat.havePlayed == False:
-            
 
-            
+    """diff = app.songTime - beatInSeconds
 
-            app.beatsOnScreen.pop(index)
-            index -= 1
-            #beat.changeStatus()
+    if diff <= .027 and diff >= -.027:
+        print(beatInSeconds, app.songTime)
+        app.drumAudio.addWork('kick')
+        app.beatQ.kickBeatMap.pop(0)
 
-        index += 1
-    
-    pass
-    
+    elif diff > .027:
+        print(beatInSeconds, app.songTime)
+        app.beatQ.kickBeatMap.pop(0)
+        print('missed')"""
+
+
+    if round(beatInSeconds, 3)  >= app.songTime-.04 and round(beatInSeconds, 3) <= app.songTime +.02:
+        app.drumAudio.addWork('kick')
+        app.beatQ.kickBeatMap.pop(0)
+        
+
+    elif round(beatInSeconds, 3) < app.songTime-.04:
+        app.drumAudio.addWork('kick')
+        app.beatQ.kickBeatMap.pop(0)
+        print('missed')
+        
+
 
 
         

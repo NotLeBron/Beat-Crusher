@@ -33,6 +33,8 @@ class Song(object):
             self.bpm = None
             raise Exception('Song Doesn\'t Exist')
 
+        pygame.mixer.music.set_volume(.7)
+
     def updateSongPosition(self, newPos):
         self.songPosition = newPos
 
@@ -61,7 +63,7 @@ class BeatQueue(object):
         self.song = song
         self.filepath = 'Resources/BeatMaps/'
 
-        self.mainMap, self.snareBeatmap, self.midTomBeatmap, self.highTomBeatmap, self.floorTomBeatmap, self.hihatBeatmap, self.cymbBeatmap = self.parsebeatmap(self.filepath+song+'.txt', track)
+        self.mainMap, self.kickBeatMap = self.parsebeatmap(self.filepath+song+'.txt', track)
         
 
 
@@ -78,12 +80,7 @@ class BeatQueue(object):
 
         beatMap = dict()
 
-        snareBeats = dict()
-        midTomBeats = dict()
-        highTomBeats = dict()
-        floorTomBeats = dict()
-        hihatBeats = dict()
-        cymbBeats = dict()
+        kickBeats = []
 
         beatID = 0 #place of beat in queue
 
@@ -98,36 +95,32 @@ class BeatQueue(object):
 
                     if int(splitLine[4]) == 38:
 
-                        snareBeats[beatID] = (int(splitLine[1]), 'snare')
                         beatMap[beatID] = (int(splitLine[1]), 'snare')
 
                     elif int(splitLine[4]) == 42:
                         beatMap[beatID] = (int(splitLine[1]), 'hihat')
-                        hihatBeats[beatID] = int(splitLine[1])
 
                     elif int(splitLine[4]) == 43:
                         beatMap[beatID] = (int(splitLine[1]), 'floor')
-                        floorTomBeats[beatID] = int(splitLine[1])
 
                     elif int(splitLine[4]) == 47:
                         beatMap[beatID] = (int(splitLine[1]), 'mid')
-                        midTomBeats[beatID] = int(splitLine[1])
 
                     elif int(splitLine[4]) == 48:
                         beatMap[beatID] = (int(splitLine[1]), 'high')
-                        highTomBeats[beatID] = int(splitLine[1])
 
                     elif int(splitLine[4]) == 49:
                         beatMap[beatID] = (int(splitLine[1]), 'cymb')
-                        cymbBeats[beatID] = int(splitLine[1])
+
+                    elif int(splitLine[4]) == 36:
+                        kickBeats.append((int(splitLine[1]), 'kick'))
 
                     
                     beatID += 1
 
                     
-        return beatMap, snareBeats, midTomBeats, highTomBeats, floorTomBeats, hihatBeats, cymbBeats
-
-        return beatMap      
+        return beatMap, kickBeats
+    
                 
 def printDict(dict):
 
