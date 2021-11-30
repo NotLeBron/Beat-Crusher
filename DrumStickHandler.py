@@ -2,6 +2,7 @@ import cv2, copy, math
 
 import numpy as np
 
+from PIL import Image, ImageTk
 
 class DrumStick(object):
 
@@ -60,8 +61,21 @@ class DrumStick(object):
 
         return self.frame
 
-    def getFrame(self):
-        return self.frame
+    
+    def opencvToTk(self, frame):
+        #from cmu_112_graphics_openCV
+        if frame is None: return
+
+        frame = self.sameRatioResize(frame, 500, 281)
+        """Convert an opencv image to a tkinter image, to display in canvas."""
+        rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(rgb_image)
+        tkImage = ImageTk.PhotoImage(image=pil_img)
+        return tkImage
+
+    def getCopyTKFrame(self):
+        tkImage = self.opencvToTk(copy.deepcopy(self.frame))
+        return tkImage
 
     def filterFrame(self, color, rawFrame, colorMin, colorMax):
         #https://docs.opencv.org/4.x/d2/d96/tutorial_py_table_of_contents_imgproc.html
@@ -210,7 +224,6 @@ class DrumStick(object):
 
     """def nothing(x):
         pass"""
-
 
     def getRedStickTip(self):
         if self.redStickContour is None: return

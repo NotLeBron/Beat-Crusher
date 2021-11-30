@@ -85,13 +85,13 @@ class DrumAudioHandler(object):
         elif piece == 'hihat':
             self.workList.append(self.playHihat)
 
-        elif piece == 'midTom':
+        elif piece == 'mid':
             self.workList.append(self.playMidTom)
 
-        elif piece == 'highTom':
+        elif piece == 'high':
             self.workList.append(self.playHighTom)
 
-        elif piece == 'floorTom':
+        elif piece == 'floor':
             self.workList.append(self.playFloorTom)
 
         elif piece == 'cymb':
