@@ -21,12 +21,15 @@ class DrumPiece(object):
         #if performance dips (framerate goes down) objects should grow faster to compensate and vice versa
         #not perfect - slow to fix animation synchronization
         #TODO: 
-        if fps > 5:
-            self.growthRate = self.calcGrowthRate() /(19 - 19/fps)
-
-        else:
+        if fps < 5:
             #first few seconds framerate will be inacurrate until it averages out
-            self.growthRate = self.calcGrowthRate() /(19 - 19/5)
+            fps = 5
+
+        if ticksPerSec == 60000/(116*384):
+            self.growthRate = self.calcGrowthRate() /(19 - 19/fps)
+        elif ticksPerSec == 60000/(83*480):
+            self.growthRate = self.calcGrowthRate() /(23 - 23/fps)
+
 
 
         if types == 'hihat':
