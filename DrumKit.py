@@ -3,13 +3,19 @@ from cmu_112_graphics import *
 import pygame
 
 class DrumPiece(object):
-
+    """creates a drumpiece object to represent a 'beat'"""
+    #used some parts (bpm, ppq, timeoffset) as my game is differnet from general rythm game - not detecting beats
+    #https://www.reddit.com/r/gamedev/comments/2fxvk4/heres_a_quick_and_dirty_guide_i_just_wrote_how_to/
     def __init__(self, timeStamp, ticksPerSec, types, timeCreated, fps, scale=.01):
         #print(currTime)
         #self.timeOnCreation = currTime
         self.types = types
-        self.offset = 2 
+        if ticksPerSec == 60000/(116*384):
+            self.offset = .5
+        elif ticksPerSec == 60000/(83*480):
+            self.offset = 1.5
         self.timeStamp = timeStamp
+        
         self.timeStampSeconds = (self.timeStamp * ticksPerSec)/1000 + self.offset
         self.havePlayed  = False
         
@@ -20,15 +26,16 @@ class DrumPiece(object):
         #changes with framerate (game performance)
         #if performance dips (framerate goes down) objects should grow faster to compensate and vice versa
         #not perfect - slow to fix animation synchronization
-        #TODO: 
+        #TODO:
+        
         if fps < 5:
             #first few seconds framerate will be inacurrate until it averages out
             fps = 5
 
         if ticksPerSec == 60000/(116*384):
-            self.growthRate = self.calcGrowthRate() /(19 - 19/fps)
+            self.growthRate = self.calcGrowthRate() /(21 - 21/fps)
         elif ticksPerSec == 60000/(83*480):
-            self.growthRate = self.calcGrowthRate() /(23 - 23/fps)
+            self.growthRate = self.calcGrowthRate() /(19 - 19/fps)
 
 
 
@@ -139,8 +146,10 @@ class Snare(DrumPiece):
         if self.scale > 1.19:
             self.scale = 1.19
 
-        x = 500 
-        y = 700 *self.scale
+        tranx = (380)*self.scale
+        x = 1920/2 - tranx
+        trany = (380)*self.scale
+        y = 380 + trany
 
         yRad = 40 *self.scale
         xRad = 110 *self.scale
@@ -338,8 +347,6 @@ class HiHat(DrumPiece):
             yRad /= 1.2
             canvas.create_oval(x+xRad, y+yRad, x-xRad, y-yRad)
 
-
-
 def createObject(timeStamp, kind, timeCreated, song, fps, ticksPerSec = 60000/(116*384)):
 
     if song == 'Smells Like Teen Spirit':
@@ -366,16 +373,17 @@ def createObject(timeStamp, kind, timeCreated, song, fps, ticksPerSec = 60000/(1
     elif kind == 'floor':
         return Tom(timeStamp, ticksPerSec, 'floor', timeCreated, fps)
 
-    
-
 def checkStatus(app, currTime):
     pass
 
 def drawObjects(app, canvas):
 
-    for beat in app.beatsOnScreen:
-        beat.drawObject(app, canvas)
 
+    for i in range(len(app.beatsOnScreen)-1,0,-1):
+        app.beatsOnScreen[i].drawObject(app,canvas)
+
+    """for beat in app.beatsOnScreen:
+        beat.drawObject(app, canvas)"""
 
 def destroyObjects(app):
 
@@ -385,7 +393,7 @@ def destroyObjects(app):
     if beatsTimeInSeconds < app.songTime+.05 and beatsTimeInSeconds > app.songTime:
         
         try:
-            if app.beatsOnScreen[0].checkHit(app.redStick[0], app.redStick[1], app.blueStick[0], app.blueStick[1]):
+            if app.beatsOnScreen[0].checkHit(app.stick1[0], app.stick1[1], app.stick2[0], app.stick2[1]):
                 app.combo += 1
                 app.earlyHits += 1
                 if app.combo not in app.comboDict:
@@ -406,7 +414,7 @@ def destroyObjects(app):
     if round(app.beatsOnScreen[0].timeStampSeconds, 3) == app.songTime:
         
         try:
-            if app.beatsOnScreen[0].checkHit(app.redStick[0], app.redStick[1], app.blueStick[0], app.blueStick[1]):
+            if app.beatsOnScreen[0].checkHit(app.stick1[0], app.stick1[1], app.stick2[0], app.stick2[1]):
                 app.combo += 1
                 app.perfectHits += 1
                 if app.combo not in app.comboDict:
@@ -424,10 +432,10 @@ def destroyObjects(app):
         except:
             pass
         
-    if round(app.beatsOnScreen[0].timeStampSeconds, 3) < app.songTime-.02:
+    if round(app.beatsOnScreen[0].timeStampSeconds, 3) < app.songTime-.01:
         
         try:
-            if app.beatsOnScreen[0].checkHit(app.redStick[0], app.redStick[1], app.blueStick[0], app.blueStick[1]):
+            if app.beatsOnScreen[0].checkHit(app.stick1[0], app.stick1[1], app.stick2[0], app.stick2[1]):
                 app.combo += 1
                 if app.combo not in app.comboDict:
                     app.comboDict[app.combo] = 0
@@ -451,7 +459,6 @@ def destroyObjects(app):
         app.drumAudio.addWork(app.beatsOnScreen[0].getName())
         app.beatsOnScreen.pop(0)
     
-
 def scale(app):
     for beat in app.beatsOnScreen:
         beat.grow()

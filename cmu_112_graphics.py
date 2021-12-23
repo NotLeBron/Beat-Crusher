@@ -1,5 +1,5 @@
 # cmu_112_graphics.py
-# version 0.9.0
+# version 0.9.1
 
 # Pre-release for CMU 15-112-f21
 
@@ -11,8 +11,8 @@ if ((sys.version_info[0] != 3) or (sys.version_info[1] < 6)):
 # Track version and file update timestamp
 import datetime
 MAJOR_VERSION = 0
-MINOR_VERSION = 9.0 # version 0.9.0
-LAST_UPDATED  = datetime.date(year=2021, month=4, day=12)
+MINOR_VERSION = 9.1 # version 0.9.1
+LAST_UPDATED  = datetime.date(year=2021, month=11, day=25)
 
 # Pending changes:
 #   * Fix Windows-only bug: Position popup dialog box over app window (already works fine on Macs)
@@ -23,6 +23,9 @@ LAST_UPDATED  = datetime.date(year=2021, month=4, day=12)
 
 # Deferred changes:
 #   * replace/augment tkinter canvas with PIL/Pillow imageDraw (perhaps with our own fn names)
+
+# Changes in v0.9.1
+#  * If we are in a mode when we call appStopped, then also call the non-modal appStopped
 
 # Changes in v0.9.0
 #  * added simpler top-level modes implementation that does not include mode objects
@@ -671,10 +674,16 @@ class TopLevelApp(App):
         super().__init__(**kwargs)
 
     def _callFn(app, fn, *args):
-        if (app.mode != None) and (app.mode != ''):
+        isAppStopped = fn == 'appStopped'
+        isUsingMode = (app.mode != None) and (app.mode != '')
+        if isUsingMode:
             fn = app.mode + '_' + fn
         fn = app._fnPrefix + fn
         if (fn in app._callersGlobals): app._callersGlobals[fn](*args)
+        if (isAppStopped and isUsingMode):
+            # call the non-mode appStopped if there is one
+            fn = app._fnPrefix + 'appStopped'
+            if (fn in app._callersGlobals): app._callersGlobals[fn](*args)
 
     def redrawAll(app, canvas): app._callFn('redrawAll', app, canvas)
     def appStarted(app): app._callFn('appStarted', app)

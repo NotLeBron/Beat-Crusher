@@ -1,15 +1,21 @@
 from cmu_112_graphics import *
 from DrumStickHandler import *
 import time, threading, pygame, queue, copy
-
+from PIL import Image, ImageTk
 from MusicHandler import *
 
 import DrumKit
 from DrumAudio import DrumAudioHandler
 
+#check resources folder for links to songs
 
+#https://youtu.be/saPhhloGc8E video
 def appStarted(app):
     app.mode = 'menu' #menu
+    app.background = Image.open('Resources/Background/menu2.jpg')
+
+    app.isTwoPlayer = False
+    
 
     app.buttonX = app.width//2
     app.playY = app.height//2
@@ -19,6 +25,7 @@ def appStarted(app):
     app.widthRad = 200
     app.heightRad = 40
 
+    #shadow backdrop of buttons
     app.playShadow = True
     app.scoreShadow = True
     app.settingShadow = True
@@ -31,7 +38,7 @@ def appStarted(app):
     app.backx = app.width//2 - 800
     app.backy = app.height//2 +400
 
-    app.backXRad = 100
+    app.backXRad = 100 #back btn
     app.currTime = 0
     app.scorePause = False #for click animation
     app.playPause = False #for click animation
@@ -40,7 +47,8 @@ def appStarted(app):
 
     app.showCam = True
     app.defaultSong = 'Smells Like Teen Spirit'
-    app.scoresToDisplay = []
+
+    app.scoresToDisplay = [] #scores menu
 
     scoreDisplayInit(app)
 
@@ -59,10 +67,8 @@ def gameStarted(app):
 
         app.totalBeats = songInfo.getTotalBeats(app.defaultSong)
 
-        app.redStick = ()
-        app.blueStick = ()
-        app.redStickCoord = ()
-        app.blueStickCoord = ()
+        app.stick1 = (0,0)
+        app.stick2 = (0,0)
 
         app.timerDelay = 500
 
@@ -90,9 +96,17 @@ def gameStarted(app):
         app.sound2 = pygame.mixer.Sound("Resources/Audio files/snare.mp3")
 
         app.q = queue.LifoQueue()
-        app.maxThreads = 14
+        app.maxThreads = 15
         app.songProgress = 0
         app.songTime = 0
+
+        if app.isTwoPlayer:
+            app.round = 1
+
+            app.player1Data = []
+            app.player2Data = []
+
+        app.userQuit = False
 
 
 
@@ -135,6 +149,7 @@ def gameStarted(app):
         app.phase3 = False
         app.phase4 = False
         app.phase5 = False
+        app.init = True
 
 def gameThreadInit(app):
     for i in range(app.maxThreads):
@@ -159,14 +174,45 @@ def updateScore(app):
     app.score = (app.perfectHits*1000) + (app.earlyHits*100) + (app.lateHits*100) + (sum(app.comboDict.values()) * 50)
 
 def checkGameOver(app):
-    if app.songProgress <= 1 and app.songProgress >= .999:
+    if (app.songProgress <= 1 and app.songProgress >= .999) or app.userQuit:
+
+        if app.isTwoPlayer:
+            calcGrade(app)
+            app.song.stop()
+
+            if app.round == 1:
+                app.player1Data=[app.score, app.accuracy, app.grade, app.hits, 
+                                    app.misses, app.combo, app.earlyHits, app.lateHits, app.perfectHits, 
+                                    app.longestCombo, copy.copy(app.comboDict)]
+
+                app.userQuit = False
+                
+
+                app.gameState = 4
+                return 
+                
+
+            elif app.round == 2:
+                app.player2Data=[app.score, app.accuracy, app.grade, app.hits, 
+                                    app.misses, app.combo, app.earlyHits, app.lateHits, app.perfectHits, 
+                                    app.longestCombo, copy.copy(app.comboDict)]
+
+                app.userQuit = False
+
+            cv2.destroyAllWindows()
+            app.drumstick.capture.release()
+            app.camThread.stop()
+            app.gameState = 5
+            return
+            
+
+
         cv2.destroyAllWindows()
         app.drumstick.capture.release()
         app.song.stop()
         app.camThread.stop()
         calcGrade(app)
         app.gameState = 2
-    pass
 
 def calcGrade(app):
 
@@ -182,7 +228,6 @@ def calcGrade(app):
             app.grade = grade[i]
             break
         elif app.score >= pointsPossible*percent:
-            print(pointsPossible*percent)
             app.grade = grade[i]
             break
         else:
@@ -193,7 +238,7 @@ def calcGrade(app):
         i += 1
     
     temp = None
-    if app.defaultSong == 'Smells Like Teeen Spirit':
+    if app.defaultSong == 'Smells Like Teen Spirit':
         temp = 0
     elif app.defaultSong == 'Boulevard of Broken Dreams':
         temp = 1
@@ -201,7 +246,6 @@ def calcGrade(app):
     file = open("Resources/Scores/scores.txt", "a")
 
     file.write(f'{app.grade} {temp} {app.score}\n')
-
 
     file.close
 
@@ -270,17 +314,13 @@ def game_timerFired(app):
             app.frameCount += 1
             updateFPS(app)
 
-
-
-
-
         for item in app.jobList:
             app.q.put(item)
 
         # block until all tasks are done
         app.q.join()
 
-    elif app.gameState == 2:
+    elif app.gameState == 2 or app.gameState == 5:
 
         if app.phase1:
             if app.hitTextScale > .009:
@@ -327,11 +367,108 @@ def game_mousePressed(app, event):
     if app.gameState == 1:
         pass
 
+    if app.gameState == 2 or app.gameState ==5:
+        if (event.x > (app.width//2 - 800 - 100) and event.x < (app.width//2 - 800 + 100) and
+            event.y > (app.height//2 +400 - 40) and event.y < (app.height//2 +400 + 40)):
+            app.mode = 'menu'
+
+def restart(app):
+    app.round = 2
+    app.mode = 'game'
+    #app.defaultSong = 'Smells Like Teen Spirit'
+    #app.defaultSong = 'Boulevard of Broken Dreams'
+    app.gameState = 1
+    if app.gameState == 1:
+        app.drumstick = DrumStick()
+        app.copyFrame = None
+
+        app.drumAudio = DrumAudioHandler(app)
+
+        app.totalBeats = songInfo.getTotalBeats(app.defaultSong)
+
+        app.stick1 = (0,0)
+        app.stick2 = (0,0)
+
+        app.timerDelay = 500
+
+        app.startTime = time.time()
+        app.ellipses = 1
+        app.isLoading = True
+
+
+        app.isCountDown = False
+
+        app.song = Song(app.defaultSong)
+        app.beatQ = BeatQueue(app.defaultSong, 2)
+        app.beatsOnScreen = []
+        app.currBeat = 0
+        app.songOffset = 1
+
+
+
+        app.lock = threading.Lock()
+        app.camThread = camThread(app)
+        app.camThread.start()
+
+
+        app.sound1 = pygame.mixer.Sound("Resources/Audio files/hihat.mp3")
+        app.sound2 = pygame.mixer.Sound("Resources/Audio files/snare.mp3")
+
+        app.q = queue.LifoQueue()
+        app.maxThreads = 15
+        app.songProgress = 0
+        app.songTime = 0
+        app.userQuit = False
+
+
+
+        app.accuracy = 0
+        app.score = 0
+        app.hits = 0
+        app.misses = 0
+        app.earlyHits = 0
+        app.lateHits = 0
+        app.perfectHits = 0
+        app.combo = 0
+        app.comboDict = dict()
+        app.longestCombo = 0
+        app.progress = 0
+
+        app.doOnce_gameCam = False
+        app.jobList = [loadingSequence]
+
+        app.frameCount = 0
+        app.fps = 0
+        app.fpsList = []
+        app.timeAtLastCheck = 0
+        app.avgFPS = 0
+        app.startFPSTracker = False
+
+        app.threads = []
+
+        gameThreadInit(app)
+
+
+        #gameOver stuff
+        app.gradeScale = 1
+        app.textScale = 1
+        app.scoreTextScale = 1
+        app.hitTextScale = 1
+        app.accTextScale = 1
+        app.comboTextScale = 1
+        app.phase1 = True
+        app.phase2 = False
+        app.phase3 = False
+        app.phase4 = False
+        app.phase5 = False
+        app.init = True
+
 def game_keyPressed(app, event):
 
     if app.gameState == 1:
         if event.key == 'z':
-            calcGrade(app)
+            app.userQuit = True
+            """calcGrade(app)
             try:
                 app.song.stop()
                 cv2.destroyAllWindows()
@@ -339,11 +476,15 @@ def game_keyPressed(app, event):
 
             except:
                 pass
-            app.gameState = 2
+            app.gameState = 2"""
+
+
+    if app.gameState == 4:
+        if event.key == 'Space':
+            restart(app)
 
 def addBeats(app):
     if len(app.beatsOnScreen) < 10:
-        default = 60000/(115*384)
 
         if app.currBeat in app.beatQ.mainMap:
 
@@ -394,12 +535,11 @@ def drawProgressBar(app, canvas):
 
 def drawStick(app, canvas):
     rad = 10
-
-    try:
-        canvas.create_oval(app.redStick[0]-rad, app.redStick[1]-rad, app.redStick[0]+rad, app.redStick[1]+rad, fill='red', width = 3)
-        canvas.create_oval(app.blueStick[0]-rad, app.blueStick[1]-rad, app.blueStick[0]+rad, app.blueStick[1]+rad, fill='green', width = 3)
-    except:
-        pass
+    (x, y) = app.stick1
+    (x0, y0) = app.stick2
+    canvas.create_oval(x-rad, y-rad, x+rad, y+rad, fill='red', width = 10)
+    
+    canvas.create_oval(x0-rad, y0-rad, x0+rad, y0+rad, fill='green', width = 10)
 
 def drawGuideCircles(app, canvas):
     #circle guide
@@ -421,7 +561,17 @@ def drawGrade(app, canvas):
         newSize = int(1920*2*app.gradeScale)
         canvas.create_text(hitx+1150, 400, text=f"{app.grade}", anchor='center', font=f'Algerian {newSize}')
 
+def drawTwoPlayerGrade(app, canvas):
+    if app.phase5:
+        hitx = 0
+        newSize = int(1920*2*app.gradeScale)
+        canvas.create_text(hitx+1150, 400, text=f"{app.player1Data[2]}", anchor='center', font=f'Algerian {newSize}')
+        hitx = 360
+        canvas.create_text(hitx+1150, 400, text=f"{app.player2Data[2]}", anchor='center', font=f'Algerian {newSize}', fill='red')
+
 def drawGameOverScreen(app, canvas):
+    if app.gameState != 2: return
+    canvas.create_rectangle(0,0,app.width,app.height, fill='#F8F0E3')  
     canvas.create_text(app.width//2, app.height*(1/9), text='GAME OVER', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
 
@@ -460,11 +610,67 @@ def drawGameOverScreen(app, canvas):
 
 def drawCamera(app, canvas):
     if app.copyFrame is None: return
-    canvas.create_image(app.width -250, app.height -140, image=app.copyFrame)
+    canvas.create_image(app.width -250, app.height -160, image=app.copyFrame)
+
+def drawTwoPlayerOverScreen(app, canvas):
+    canvas.create_text(app.width//2, app.height*(1/9), text='GAME OVER', anchor='center', font='Algerian 50 bold')
+    canvas.create_line(300, 200, 1620, 200, width=2)
+
+    if app.phase4:
+        scoreText = 'SCORE: ' + str(app.score)
+        scoreFontSize = int(3840 *app.scoreTextScale) #75 normal
+        canvas.create_text(150, 250, text=f'SCORE: {app.player1Data[0]}', anchor='nw', font=f'Algerian {scoreFontSize} ')
+        canvas.create_text(150, 450, text=f'SCORE: {app.player2Data[0]}', anchor='nw', font=f'Algerian {scoreFontSize} ', fill='red')
+        #canvas.create_line(150, 420, len(scoreText)*scoreFontSize-130, 420, width=2)
+
+    if app.phase1:
+        hitText = 'HITS/MISSES'
+        hitFontSize = int(3840*app.hitTextScale)#normal 35
+        hitx = 100
+        canvas.create_text(hitx, 700, text=hitText, anchor='nw', font=f'Algerian {hitFontSize}')
+        canvas.create_line(hitx, 760, 525, 760, width=2)
+        SubTextFontSize = 14
+        canvas.create_text(hitx, 810, text=f"-> Total Hits     {app.player1Data[3]}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx, 860, text=f"--------> Perfect Hits     {app.player1Data[8]}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx, 900, text=f"--------> Early Hits         {app.player1Data[6]}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx, 940, text=f"--------> Late Hits            {app.player1Data[7]}x", anchor='nw', font=f'Algerian {SubTextFontSize}')
+
+        hitx = 375
+        canvas.create_text(hitx, 810, text=f"-> Total Hits     {app.player2Data[3]}x", anchor='nw', font=f'Algerian {SubTextFontSize}', fill='red')
+        canvas.create_text(hitx, 860, text=f"--------> Perfect Hits     {app.player2Data[8]}x", anchor='nw', font=f'Algerian {SubTextFontSize}', fill='red')
+        canvas.create_text(hitx, 900, text=f"--------> Early Hits         {app.player2Data[6]}x", anchor='nw', font=f'Algerian {SubTextFontSize}', fill='red')
+        canvas.create_text(hitx, 940, text=f"--------> Late Hits            {app.player2Data[7]}x", anchor='nw', font=f'Algerian {SubTextFontSize}', fill='red')
+    
+    if app.phase2:
+        accText = 'Accuracy'
+        accFontSize = int(3840*app.accTextScale)#normal 35
+        hitx = 200
+        canvas.create_text(hitx+660, 730, text=accText, anchor='w', font=f'Algerian {accFontSize}')
+        canvas.create_line(hitx+660, 760, hitx+905, 760, width=2)
+        canvas.create_text(hitx+660, 820, text=f"-> {app.player1Data[1]*100}% Hit Rate", anchor='w', font=f'Algerian {SubTextFontSize}')
+
+        canvas.create_text(hitx+660, 920, text=f"-> {app.player2Data[1]*100}% Hit Rate", anchor='w', font=f'Algerian {SubTextFontSize}', fill='red')
+
+    if app.phase3:
+        comboText = 'COMBO'
+        comboFontSize = int(3840*app.comboTextScale)#normal 35
+
+        hitx=200
+        canvas.create_text(hitx+660*2, 700, text=comboText, anchor='n', font=f'Algerian {comboFontSize}')
+        canvas.create_line(hitx+1245, 760, hitx+1395, 760, width=2)
+        canvas.create_text(hitx+1245, 810, text=f"-> Combos     {sum(app.player1Data[10])}x", anchor='w', font=f'Algerian {SubTextFontSize}')
+        canvas.create_text(hitx+1245, 860, text=f"--------> Longest Combo     {app.player1Data[9]}x", anchor='w', font=f'Algerian {SubTextFontSize}')
+        
+        
+        canvas.create_text(hitx+1245, 910, text=f"-> Combos     {sum(app.player2Data[10])}x", anchor='w', font=f'Algerian {SubTextFontSize}', fill='red')
+        canvas.create_text(hitx+1245,960, text=f"--------> Longest Combo     {app.player2Data[9]}x", anchor='w', font=f'Algerian {SubTextFontSize}', fill='red')
+        
+
 
 def game_redrawAll(app, canvas):
+    canvas.create_rectangle(0,0,app.width,app.height, fill='#F8F0E3')  
 
-    if app.gameState == 1:
+    if app.gameState == 1 and app.init:
         if app.isLoading: #allows time for camera, etc to turn on/load
             canvas.create_text(app.width//2, app.height//2, text ='loading' + '.'*app.ellipses, font='Algerian 30 bold')
 
@@ -477,15 +683,27 @@ def game_redrawAll(app, canvas):
             drawScore(app, canvas)
             drawCombo(app, canvas)
             drawProgressBar(app, canvas)
-            drawCamera(app, canvas)
+            
             if app.showCam:
-                drawStick(app, canvas)
+                drawCamera(app, canvas)
+                pass
+            drawStick(app, canvas)
             
 
     elif app.gameState ==2:
         drawGameOverScreen(app, canvas)
         drawGrade(app, canvas)
+        drawBackBtn(app, canvas)
         pass
+
+    elif app.gameState ==4:
+        canvas.create_text(app.width//2, app.height//2, text ='Player 2 Press Space to Start', anchor = 'center',font='Algerian 30 bold')
+
+
+    elif app.gameState == 5:
+        drawTwoPlayerOverScreen(app, canvas)
+        drawTwoPlayerGrade(app, canvas)
+        drawBackBtn(app, canvas)
 
 def game_appStopped(app):
     cv2.destroyAllWindows()
@@ -540,12 +758,16 @@ def menu_mousePressed(app, event):
             if (event.x > (app.width//4 + 75-15) and event.x < (app.width//4 + 75+15) and
                 event.y > (425-15) and event.y < (425+15)):
                 app.defaultSong = 'Smells Like Teen Spirit'
-                print('song1')
 
             #song choice 2
             if (event.x > (app.width//4 + 75-15) and event.x < (app.width//4 + 75+15) and
                 event.y > (475-15) and event.y < (475+15)):
                 app.defaultSong = 'Boulevard of Broken Dreams'
+
+            #two player
+            if (event.x > (680-15) and event.x < (680+15) and
+                event.y > (540-15) and event.y < (540+15)):
+                app.isTwoPlayer = True if app.isTwoPlayer == False else False
 
         if (event.x > (app.backx - app.backXRad) and event.x < (app.backx + app.backXRad) and
             event.y > (app.backy - app.heightRad) and event.y < (app.backy + app.heightRad)):
@@ -586,26 +808,29 @@ def menu_timerFired(app):
 def drawMenuScreen(app, canvas):
     #TODO FIND BACKGROUND
     #font name: groOvEd PERSONAL USE
-    canvas.create_rectangle(0, 0, app.width, app.height, fill='#407076')
+    #canvas.create_rectangle(0, 0, app.width, app.height, fill='#407076')
+    
+    canvas.create_rectangle(0,0,app.width,app.height, fill='black')
+    canvas.create_image(app.width//2, app.height//3.5, image=ImageTk.PhotoImage(app.background))
 
-    canvas.create_text(app.width//2, app.height*(1/9), text='BEAT CRUSHER', anchor='center', font='Algerian 80 bold')
+    canvas.create_text(app.width//2, app.height*(1/9), text='BEAT CRUSHER', anchor='center', font='Algerian 80 bold', fill='white')
 
 
     #play button
     if app.playShadow: #'animate' click
-        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.playY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.playY+app.heightRad+app.shadowShift, fill='black')
+        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.playY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.playY+app.heightRad+app.shadowShift, fill='gray')
     canvas.create_rectangle(app.buttonX-app.widthRad, app.playY-app.heightRad, app.buttonX+app.widthRad, app.playY+app.heightRad, fill='white', state='disabled')
     canvas.create_text(app.buttonX, app.playY, text='Play', anchor='center', font='Algerian 30 bold')
 
     #scores button
     if app.scoreShadow == True:
-        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.scoresY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.scoresY+app.heightRad+app.shadowShift, fill='black')
+        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.scoresY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.scoresY+app.heightRad+app.shadowShift, fill='gray')
     canvas.create_rectangle(app.buttonX-app.widthRad, app.scoresY-app.heightRad, app.buttonX+app.widthRad, app.scoresY+app.heightRad, fill='white')
     canvas.create_text(app.buttonX, app.scoresY, text='Scores', anchor='center', font='Algerian 30 bold')
 
     #settings button
     if app.settingShadow == True:
-        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.settingsY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.settingsY+app.heightRad+app.shadowShift, fill='black')
+        canvas.create_rectangle(app.buttonX-app.widthRad+app.shadowShift, app.settingsY-app.heightRad+app.shadowShift, app.buttonX+app.widthRad+app.shadowShift, app.settingsY+app.heightRad+app.shadowShift, fill='gray')
     canvas.create_rectangle(app.buttonX-app.widthRad, app.settingsY-app.heightRad, app.buttonX+app.widthRad, app.settingsY+app.heightRad, fill='white')
     canvas.create_text(app.buttonX, app.settingsY, text='Settings', anchor='center', font='Algerian 30 bold')
 
@@ -631,7 +856,6 @@ def scoreDisplayInit(app):
                 entries.append((splitLine[0], int(splitLine[1]), int(splitLine[2]) ) )
 
     scoresList = sorted(scoresList, reverse=True)
-    print(scoresList)
     
     if len(scoresList) > 10:
         scoresList = scoresList[0:9]
@@ -645,9 +869,8 @@ def scoreDisplayInit(app):
 
                 break
 
-    print(app.scoresToDisplay)
-
 def drawScoreScreen(app, canvas):
+    canvas.create_rectangle(0,0,app.width,app.height, fill='#F8F0E3')     
     canvas.create_text(app.width//2, app.height*(1/9), text='High Scores', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
 
@@ -674,6 +897,7 @@ def drawScoreScreen(app, canvas):
     drawBackBtn(app, canvas)
 
 def drawSettingScreen(app, canvas):
+    canvas.create_rectangle(0,0,app.width,app.height, fill='#F8F0E3')  
     canvas.create_text(app.width//2, app.height*(1/9), text='Settings', anchor='center', font='Algerian 50 bold')
     canvas.create_line(300, 200, 1620, 200, width=2)
 
@@ -704,9 +928,24 @@ def drawSettingScreen(app, canvas):
     canvas.create_rectangle(x-rad, y-rad, x+rad, y+rad, fill=song2checked)
 
 
+
+    canvas.create_text(app.width//4, 525, text='Two Player - ', anchor='nw', font='Algerian 20 ')
+    rad = 15
+    checked = ''
+    checked = 'black' if app.isTwoPlayer == True else 'white'
+    x =680
+    y = 540
+    canvas.create_rectangle(x-rad, y-rad, x+rad, y+rad, fill=checked)
+
     drawBackBtn(app, canvas)
 
 def drawBackBtn(app, canvas):
+
+    if app.mode == 'game':
+        canvas.create_rectangle(app.backx-app.backXRad+app.shadowShift, app.backy-app.heightRad+app.shadowShift, app.backx+app.backXRad+app.shadowShift, app.backy+app.heightRad+app.shadowShift, fill='black')
+        canvas.create_rectangle(app.backx-app.backXRad, app.backy-app.heightRad, app.backx+app.backXRad, app.backy+app.heightRad, fill='white')
+        canvas.create_text(app.backx, app.backy, text='Back', anchor='center', font='Algerian 30 bold')
+
     if app.backShadow:
         canvas.create_rectangle(app.backx-app.backXRad+app.shadowShift, app.backy-app.heightRad+app.shadowShift, app.backx+app.backXRad+app.shadowShift, app.backy+app.heightRad+app.shadowShift, fill='black')
     canvas.create_rectangle(app.backx-app.backXRad, app.backy-app.heightRad, app.backx+app.backXRad, app.backy+app.heightRad, fill='white')
@@ -749,8 +988,12 @@ class camThread(threading.Thread):
         while self.running:
             self.app.drumstick.run()
             self.app.copyFrame = self.app.drumstick.getCopyTKFrame()
-            self.app.redStick = self.app.drumstick.getRedStickTip()
-            self.app.blueStick = self.app.drumstick.getBlueStickTip()
+
+            #self.app.stick1 = self.app.drumstick.getLargestLightCenter()
+            #self.app.stick2 = self.app.drumstick.getNextLargestLightCenter()
+            
+            self.app.stick1 = self.app.drumstick.getRedStickTip()
+            self.app.stick2 = self.app.drumstick.getBlueStickTip()
 
             try:
                 #cv2.imshow('f', self.app.drumstick.getFrame())
@@ -771,6 +1014,7 @@ class camThread(threading.Thread):
 
 def main():
     #use mvcCheck=False to bypass false mvc violation
+    #false postive due to multithreading??? 
     runApp(width = 1920, height = 1200, mvcCheck=False)
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import pygame, pyaudio, wave, time 
+import pygame 
 from threading import Thread
 import queue
 from cmu_112_graphics import *
@@ -8,6 +8,8 @@ pygame.mixer.init()
 
 
 class DrumAudioHandler(object):
+    """Purpose: handles drum audio by spliting up on many threads. this allows
+    for concurrent playback of different or same audio clips"""
 
     def __init__(self, app):
         pygame.mixer.init()
@@ -29,6 +31,7 @@ class DrumAudioHandler(object):
         self.threadInit()
 
     def threadInit(self):
+        """starts audio threads"""
         for i in range(self.maxThreads):
             t = Thread(target=self.worker)
             t.name = f'Audio Thread {i}'
@@ -64,6 +67,7 @@ class DrumAudioHandler(object):
         self.kick.play()
 
     def worker(self):
+        """each worker thread looks for work in the audio queue"""
         #Help from python queue & multithreadingexample https://gist.github.com/arthuralvim/356795612606326f08d99c6cd375f796
         while True:
             item = self.q.get()
@@ -71,6 +75,7 @@ class DrumAudioHandler(object):
                 break
             item()
             try:
+                #remove task once done
                 self.workList.remove(item)
             except:
                 pass
@@ -101,6 +106,7 @@ class DrumAudioHandler(object):
             self.workList.append(self.playKick)
 
     def executeWork(self, app):
+        #add more work to queue
         for item in self.workList:
             self.q.put(item)
 
