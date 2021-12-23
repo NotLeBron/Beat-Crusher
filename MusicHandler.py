@@ -1,7 +1,8 @@
-import pyaudio, wave, DrumKit, pygame
+import pygame
 
 
 class Song(object):
+    """Purpose: plays main song and keeps track of important song infor (song length, pos, etc)"""
     def __init__(self, name):
         #https://people.csail.mit.edu/hubert/pyaudio/docs/ example used
 
@@ -62,6 +63,7 @@ class Song(object):
         return temp.get_length()
 
 class BeatQueue(object):
+    """purpose: read in a midi txt file and create a beatmap that this program can use"""
     def __init__(self, song, track):
         self.song = song
         self.filepath = 'Resources/BeatMaps/'
@@ -71,6 +73,7 @@ class BeatQueue(object):
 
 
     def getBeat(self, beatId):
+        """removes and returns a beat if it matches the given beatID"""
 
         for set in self.beatmap:
             if beatId in set:
@@ -80,10 +83,11 @@ class BeatQueue(object):
 
 
     def parsebeatmap(self, filepath, track):
+        """parses a beat map text file"""
 
         beatMap = dict()
 
-        kickBeats = []
+        kickBeats = [] #for bass drum
 
         beatID = 0 #place of beat in queue
 
@@ -95,6 +99,7 @@ class BeatQueue(object):
                 splitLine = line.split(', ')
 
                 if int(splitLine[0]) == track:
+                    #assigns each beats its respective drum piece
 
                     if int(splitLine[4]) == 38:
 
@@ -124,7 +129,8 @@ class BeatQueue(object):
                     
         return beatMap, kickBeats
     
-                
+
+#debugging purposes  
 def printDict(dict):
 
     for element in dict:
@@ -133,12 +139,13 @@ def printDict(dict):
 
 
 class songInfo():
+    """holds vital info on each songs"""
 
 
     def getTickPerSecond(song):
-
+        # https://stackoverflow.com/questions/2038313/converting-midi-ticks-to-actual-playback-seconds
+        #formula for midi ticks to seconds
         if song =='Smells Like Teen Spirit':
-            totalBeats = 1727
             bpm = 116
             offset = 0
             ppq = 384
@@ -146,7 +153,6 @@ class songInfo():
 
 
         elif song =='Boulevard of Broken Dreams':
-            totalBeats = 1221
             bpm = 83
             offset = 0
             ppq = 480

@@ -4,15 +4,18 @@ import numpy as np
 
 from PIL import Image, ImageTk
 
+"Purpose: handle camera input and extract necessary information, such as object location, etc"
 class DrumStick(object):
 
     def __init__(self):
         self.capture = cv2.VideoCapture(0)
         
+        #resize to fit screen
+        #currently only my screen resolution
         self.capture.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 1200)
         
-
+        #testing purposes https://docs.opencv.org/3.4/da/d6a/tutorial_trackbar.html
         """cv2.namedWindow('controls', cv2.WINDOW_AUTOSIZE)
         cv2.resizeWindow('controls',500, 500)"""
         """cv2.createTrackbar('rm','controls',167,255,self.nothing)
@@ -23,7 +26,7 @@ class DrumStick(object):
         cv2.createTrackbar('gf','controls',255,255,self.nothing)
         cv2.createTrackbar('bf','controls',255,255,self.nothing)"""
 
-        #OPTIMAL VALUES TO DETECT RED COLOR
+        #OPTIMAL VALUES TO DETECT RED COLOR https://docs.opencv.org/3.4/da/d97/tutorial_threshold_inRange.html
         self.RED_MIN = np.array([167, 118, 0])
         self.RED_MAX = np.array([255, 255 ,255])
 
@@ -32,21 +35,26 @@ class DrumStick(object):
 
 
         self.frame = None
+        self.rawFrame = None
         self.redStickContour = None
         self.blueStickContour = None
+        self.contours = None
+        self.largestContour= None
+        self.nextLargestContour= None
 
 
     def run(self):
+        """process frame each call"""
         ret, frame = self.capture.read()
         frame = cv2.flip(frame, 1)
 
         frame = self.sameRatioResize(frame, 2560, 1440)
+        self.rawFrame = frame
 
         
         self.filterFrame('red', copy.deepcopy(frame), self.RED_MIN, self.RED_MAX)
         self.filterFrame('blue', copy.deepcopy(frame), self.BLUE_MIN, self.BLUE_MAX)
 
-        contours = [self.blueStickContour, self.redStickContour]
 
         try:
             #light
@@ -54,8 +62,9 @@ class DrumStick(object):
 
 
             #object
-            self.frame = cv2.drawContours(frame,contours[0],0,(0,255,0),2)
-            self.frame = cv2.drawContours(frame,contours[1],0,(0,255,0),2)
+            self.frame = cv2.drawContours(frame,self.contours[0],0,(0,255,0),2)
+            self.frame = cv2.drawContours(frame,self.contours[1],0,(0,255,0),2)
+            #self.rawFrame = self.frame
         except:
             pass
 
@@ -74,11 +83,17 @@ class DrumStick(object):
         return tkImage
 
     def getCopyTKFrame(self):
-        tkImage = self.opencvToTk(copy.deepcopy(self.frame))
+        """returns raw frame to display to game window"""
+        tkImage = self.opencvToTk(copy.deepcopy(self.rawFrame))
         return tkImage
 
     def filterFrame(self, color, rawFrame, colorMin, colorMax):
+        """use for object detection using colors"""
         #https://docs.opencv.org/4.x/d2/d96/tutorial_py_table_of_contents_imgproc.html
+        #see sections:
+        #contours in opencv
+        #image thresholding
+        #changing color spaces
         if rawFrame is None:return
         hsvFrame = cv2.cvtColor(rawFrame, cv2.COLOR_BGR2HSV)
 
@@ -158,7 +173,7 @@ class DrumStick(object):
         return newFrame
 
     def processFrame(self, frame):
-
+        """used for light detection"""
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
         #remove everything but bright white light
@@ -170,40 +185,50 @@ class DrumStick(object):
         #decreases size of lights
         dilatedFrame = cv2.dilate(erodedFrame,None,iterations=5)
 
+        #https://docs.opencv.org/3.4/d4/d73/tutorial_py_contours_begin.html 
+        #identify light spots
+        self.contours, hierarchy = cv2.findContours(image=dilatedFrame, mode=cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE)
+        finalImg = dilatedFrame.copy()
+        finalImg = cv2.cvtColor(finalImg, cv2.COLOR_GRAY2BGR)
+
+        self.computeTwoLargestContours()
+
+        
+        
         
 
+        """try:
+            #self.largestContour = max(self.contours, key = cv2.contourArea)
+            self.largestContour = self.contours[-1]
+            print(self.contours.index(self.largestContour))
+            self.contours.pop(self.contours.index(self.largestContour))
+            self.nextLargestContour = max(self.contours, key = cv2.contourArea)
+            print(self.nextLargestContour)
 
-        #draws circle around light spots
-        contours, hierarchy = cv2.findContours(image=dilatedFrame, mode=cv2.RETR_LIST, method=cv2.CHAIN_APPROX_SIMPLE)
-        finalImg = dilatedFrame.copy()
-        finalImg = cv2.cvtColor(finalImg, cv2.COLOR_GRAY2BGR) 
 
-        try:
-            largestContour = max(contours, key = cv2.contourArea)
-            rect = cv2.minAreaRect(largestContour)
+            #self.largestContour = self.contours[-1]
+            rect = cv2.minAreaRect(self.largestContour)
             box = cv2.boxPoints(rect) 
             nbox = np.int0(box)
             boxArea = self.getPolyArea(nbox)
 
             if boxArea > 3000:
                 cv2.drawContours(finalImg,[nbox],0,(0,255,0),2)
-
-                return finalImg
-
+                self.frame = finalImg
 
             elif boxArea > 100:
                 #print('weak SIGNAL - RED STICK')
                 pass
 
         except:
-            pass
+            pass"""
+        
+        
 
-
-
-
-        cv2.drawContours(image=finalImg, contours=self.contours, contourIdx=-1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
+        #cv2.drawContours(image=self.frame, contours=self.contours, contourIdx=-1, color=(0, 255, 0), thickness=2, lineType=cv2.LINE_AA)
 
     def getPolyArea(self, poly):
+        """calculates the area of a given polygon"""
         #https://keisan.casio.com/exec/system/1322718857   formula for area of inscribed quad 
 
         pA = poly[0]
@@ -225,10 +250,20 @@ class DrumStick(object):
     """def nothing(x):
         pass"""
 
+    
     def getRedStickTip(self):
-        if self.redStickContour is None: return
+        if self.redStickContour is None: return (0, 0)
+        
 
         
+
+
+
+
+
+
+
+
         #[array][point][x or y] .......0 required for array
         avgX = (self.redStickContour[0][0][0] + self.redStickContour[0][1][0])/2
         avgY = (self.redStickContour[0][0][1] + self.redStickContour[0][1][1])/2
@@ -249,7 +284,7 @@ class DrumStick(object):
 
     def getBlueStickTip(self):
 
-        if self.blueStickContour is None: return
+        if self.blueStickContour is None: return (0, 0)
 
         
         #[array][point][x or y] .......0 required for array
@@ -270,8 +305,34 @@ class DrumStick(object):
 
         return (absX, absY)
 
+    def getLargestLightCenter(self):
+        #https://docs.opencv.org/4.x/dd/d49/tutorial_py_contour_features.html
+        #center of contour
+        """returns the cneter of the largest light"""
+        if self.largestContour is None: return (0,0)
+        M = cv2.moments(self.largestContour)
+        cX = int(M["m10"] / M["m00"])
+        cY = int(M["m01"] / M["m00"])
+
+
+
+        return (cX, cY)
+        pass
+
+    def getNextLargestLightCenter(self):
+        #https://docs.opencv.org/4.x/dd/d49/tutorial_py_contour_features.html
+        #center of contour
+        """returns the center of the 2nd largest light"""
+        if self.nextLargestContour is None: return (0,0)
+        M = cv2.moments(self.nextLargestContour)
+        cX = int(M["m10"] / M["m00"])
+        cY = int(M["m01"] / M["m00"])
+        return (cX, cY)
+
+        pass
 
     def sameRatioResize(self, frame, width, height):
+        """returns resized image with perserved aspect ratio"""
 
         if frame is None:return
         fW = frame.shape[0]
@@ -287,3 +348,29 @@ class DrumStick(object):
             
 
         pass
+
+    def computeTwoLargestContours(self):
+        """finds two largest light source in a frame"""
+        contourAreas = dict()
+
+        for i in range(len(self.contours)):
+            contourAreas[i] = cv2.contourArea(self.contours[i])
+
+
+        largest = 0 #index
+        secondLargest = 0
+
+        for key in contourAreas:
+            if contourAreas[largest] < contourAreas[key]:
+                largest = key
+
+        contourAreas.pop(largest, None)
+
+        for key in contourAreas:
+            if contourAreas[secondLargest] < contourAreas[key]:
+                secondLargest = key
+
+        self.largestContour = self.contours[largest]
+        self.nextLargestContour = self.contours[secondLargest]
+
+
